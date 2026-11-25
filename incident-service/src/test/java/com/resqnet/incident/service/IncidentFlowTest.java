@@ -3,6 +3,7 @@ package com.resqnet.incident.service;
 import com.resqnet.incident.dto.CreateIncidentRequest;
 import com.resqnet.incident.dto.IncidentResponse;
 import com.resqnet.incident.exception.ApiException;
+import com.resqnet.incident.messaging.IncidentEvent;
 import com.resqnet.incident.model.IncidentStatus;
 import com.resqnet.incident.model.IncidentType;
 import com.resqnet.incident.model.Severity;
@@ -14,6 +15,9 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -36,6 +40,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests the real incident flow with the real circuit breaker (Spring AOP proxy) and a real PostgreSQL
@@ -67,6 +77,7 @@ class IncidentFlowTest {
     @Autowired IncidentService service;
     @Autowired IncidentRepository repository;
     @Autowired CircuitBreakerRegistry breakers;
+    @MockitoBean RabbitTemplate rabbit;          // no broker needed: we check what would be sent
 
     final CurrentUser asha = new CurrentUser(2L, "asha", "USER");
     final CurrentUser ravi = new CurrentUser(3L, "ravi", "USER");
@@ -80,6 +91,7 @@ class IncidentFlowTest {
         releaseCalls.set(0);
         breakers.circuitBreaker("responderService").reset();   // every test starts with a CLOSED breaker
         repository.deleteAll();
+        org.mockito.Mockito.reset(rabbit);
     }
 
     @AfterAll
@@ -233,6 +245,87 @@ class IncidentFlowTest {
     @Test
     void unknownIncidentIs404() {
         assertEquals("NOT_FOUND", assertThrows(ApiException.class, () -> service.get(admin, 999999L)).getCode());
+    }
+
+    // ---- events (asynchronous communication) ---------------------------------------------------
+
+    @Test
+    void assignedIncidentPublishesIncidentAssignedEvent() {
+        IncidentResponse r = report(asha);
+
+        IncidentEvent e = publishedEvent("incident.assigned");
+        assertEquals("INCIDENT_ASSIGNED", e.eventType());
+        assertEquals(r.id(), e.incidentId());
+        assertEquals(2L, e.userId());
+        assertEquals("asha", e.username());
+        assertEquals("MEDICAL", e.incidentType());
+        assertEquals("CRITICAL", e.severity());
+        assertEquals("ASSIGNED", e.status());
+        assertEquals("Ambulance Alpha", e.responder().name());
+        assertNotNull(e.eventId());
+    }
+
+    @Test
+    void noResponder409PublishesIncidentPendingEvent() {
+        mode.set(Mode.CONFLICT);
+
+        report(asha);
+
+        IncidentEvent e = publishedEvent("incident.pending");
+        assertEquals("INCIDENT_PENDING", e.eventType());
+        assertEquals("PENDING", e.status());
+        assertNull(e.responder());
+    }
+
+    @Test
+    void responderDownPublishesIncidentPendingEvent() {
+        stub.stop(0);
+
+        report(asha);
+
+        assertEquals("INCIDENT_PENDING", publishedEvent("incident.pending").eventType());
+    }
+
+    @Test
+    void everyEventHasItsOwnEventId() {
+        report(asha);
+        report(asha);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(rabbit, org.mockito.Mockito.times(2)).convertAndSend(eq("resqnet.events"), anyString(), captor.capture());
+        assertTrue(!((IncidentEvent) captor.getAllValues().get(0)).eventId()
+                .equals(((IncidentEvent) captor.getAllValues().get(1)).eventId()));
+    }
+
+    @Test
+    void brokerFailureNeverFailsTheIncidentRequest() {
+        doThrow(new org.springframework.amqp.AmqpConnectException(new java.net.ConnectException("rabbit down")))
+                .when(rabbit).convertAndSend(anyString(), anyString(), any(Object.class));
+
+        IncidentResponse r = report(asha);                       // must still return 201-style success
+
+        assertEquals("ASSIGNED", r.status());
+        assertEquals(IncidentStatus.ASSIGNED, repository.findById(r.id()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void successfulDispatchPublishesAssignedButFailedDispatchPublishesNothing() {
+        mode.set(Mode.CONFLICT);
+        IncidentResponse pending = report(asha);
+        org.mockito.Mockito.reset(rabbit);
+
+        service.dispatch(admin, pending.id());                    // still no responder -> still PENDING
+        verify(rabbit, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+
+        mode.set(Mode.ASSIGN_OK);
+        service.dispatch(admin, pending.id());                    // now it works
+        assertEquals("INCIDENT_ASSIGNED", publishedEvent("incident.assigned").eventType());
+    }
+
+    private IncidentEvent publishedEvent(String routingKey) {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(rabbit).convertAndSend(eq("resqnet.events"), eq(routingKey), captor.capture());
+        return (IncidentEvent) captor.getValue();
     }
 
     // ---- helpers ------------------------------------------------------------------------------

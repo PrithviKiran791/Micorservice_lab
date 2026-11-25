@@ -1,5 +1,38 @@
+# notification-service configuration. Everything comes from environment variables.
+# For local runs use the "local" profile (application-local.yml), which holds DEMO values only.
 server:
   port: ${SERVER_PORT:8084}
+
 spring:
   application:
     name: notification-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update          # dev/lab only (rule R-DB-1); Flyway is future work
+    open-in-view: false
+  # RabbitMQ host/port/user/password come from SPRING_RABBITMQ_* env vars (Spring Boot reads them itself);
+  # defaults are localhost:5672 guest/guest, which matches docker-compose.
+  rabbitmq:
+    listener:
+      simple:
+        # A message that fails (for example malformed) is dropped, not put back in the queue forever.
+        # (Stretch: send such messages to a dead-letter queue instead.)
+        default-requeue-rejected: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db   # ready = database reachable. The broker is deliberately not included,
+                                       # so a RabbitMQ outage does not make GET /notifications unavailable.

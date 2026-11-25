@@ -9,8 +9,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | Walking skeleton done on Minikube; next Phase 3 (events + notification-service) |
-| Next action | Phase 3: RabbitMQ declarables, publisher, notification-service |
+| Phase | 4 done (all 7 pods Ready, events + resilience + restarts verified in Minikube); next Phase 5 |
+| Next action | Phase 5: smoke-test.ps1, demo-resilience.ps1, verify-references.ps1, Postman collection, two clean-cluster runs |
 | Blockers | None (GitHub push awaiting authorization) |
 | Last updated | 25 Nov 2026 |
 
@@ -46,7 +46,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [x] **api-gateway**: Java `RouteLocator` with 4 routes (`StripPrefix=1`)
 - [x] **api-gateway**: `JwtAuthenticationFilter` (public paths, strip headers, validate, add `X-User-*`, 401 JSON)
 - [x] Gateway test: no token -> 401; valid token -> reaches auth-service `/auth/me`
-- [ ] Actuator health + probes enabled in all services
+- [x] Actuator health + probes enabled in all services
 
 ## Phase 2 - Core dispatch (Hours 4-8)
 
@@ -63,25 +63,25 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 3 - Async events (Hours 8-10)
 
-- [ ] RabbitMQ declarables (exchange, queue, binding) in both services
-- [ ] **incident-service**: publish `incident.assigned` and `incident.pending` (JSON)
-- [ ] **notification-service**: entity, listener, idempotent save (`event_id` unique)
-- [ ] **notification-service**: `GET /notifications`, `PATCH /notifications/{id}/read`
-- [ ] End-to-end: report incident -> notification appears for that user
+- [x] RabbitMQ declarables (exchange, queue, binding) in both services
+- [x] **incident-service**: publish `incident.assigned` and `incident.pending` (JSON)
+- [x] **notification-service**: entity, listener, idempotent save (`event_id` unique)
+- [x] **notification-service**: `GET /notifications`, `PATCH /notifications/{id}/read`
+- [x] End-to-end: report incident -> notification appears for that user
 
 ## Phase 4 - Kubernetes on Minikube (Hours 10-14)  (start early if possible!)
 
-- [ ] Dockerfile in each of the 5 services; jars built
-- [ ] Images built inside Minikube (`minikube docker-env`): 5 images tagged `resqnet/<service>:1.0`
-- [ ] `00-namespace.yaml`, `01-secrets.yaml`, `02-config.yaml`
-- [ ] `10-postgres.yaml` (PVC + init script) - pod Ready, 4 databases exist
-- [ ] `11-rabbitmq.yaml` - pod Ready, queue visible
-- [ ] `20..23` service manifests (Deployment + ClusterIP + probes + resources)
-- [ ] `30-gateway.yaml` (NodePort 30080) and `kubectl port-forward` to `localhost:8080` works
-- [ ] All pods `1/1 Running`
-- [ ] Full flow works inside the cluster (register -> login -> report -> notification)
-- [ ] Resilience: `kubectl scale deploy/responder-service --replicas=0` -> `PENDING`, others answer; scale back to 1 -> dispatch works
-- [ ] Postgres check: `kubectl exec` -> `\l` shows 4 databases
+- [x] Dockerfile in each of the 5 services; jars built
+- [x] Images built inside Minikube (`minikube docker-env`): 5 images tagged `resqnet/<service>:1.0`
+- [x] `00-namespace.yaml`, `01-secrets.yaml`, `02-config.yaml`
+- [x] `10-postgres.yaml` (PVC + init script) - pod Ready, 4 databases exist
+- [x] `11-rabbitmq.yaml` - pod Ready, queue visible
+- [x] `20..23` service manifests (Deployment + ClusterIP + probes + resources)
+- [x] `30-gateway.yaml` (NodePort 30080) and `kubectl port-forward` to `localhost:8080` works
+- [x] All pods `1/1 Running`
+- [x] Full flow works inside the cluster (register -> login -> report -> notification)
+- [x] Resilience: `kubectl scale deploy/responder-service --replicas=0` -> `PENDING`, others answer; scale back to 1 -> dispatch works
+- [x] Postgres check: `kubectl exec` -> `\l` shows 4 databases
 
 ## Phase 5 - Demo readiness (Hours 14-16)
 
@@ -134,6 +134,9 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | responder-service adds schema.sql (CHECK + partial unique index) run after Hibernate | ddl-auto cannot express them; they are the DB-level guarantee of one responder per incident |
 | 25 Nov 2026 | App Deployments use an initContainer (postgres:16, pg_isready) before starting | Without it the apps crashed 3x while Postgres ran its init script, causing RESTARTS > 0 |
 | 25 Nov 2026 | scripts/deploy-minikube.ps1 builds with Docker Desktop and uses `minikube image load`; $ErrorActionPreference=Continue | containerd runtime; PS 5.1 aborts on native stderr under Stop |
+| 25 Nov 2026 | Readiness = database only (no RabbitMQ) in incident and notification services | A broker outage must not make incident-service unready (R-MQ-4: incident still saved, 201); a stricter reading of R-RS-4 would take it out of the Service |
+| 25 Nov 2026 | Failed messages are dropped (default-requeue-rejected=false), no dead-letter queue yet | Avoids an endless redelivery loop on a bad message; DLQ is a stretch item |
+| 25 Nov 2026 | Dispatch publishes incident.assigned only when it succeeds; a failed retry publishes nothing | Avoids repeating the "waiting for a responder" notification |
 
 ## Work log
 
@@ -146,6 +149,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Phase 1: compose (Postgres 4 DBs + RabbitMQ), auth-service, gateway routes + JWT filter. auth 5/5 tests, gateway 12/12 tests; live checks through gateway: 401 no/garbage/wrong-secret token, 201/409/400 register, 401 login, /me, forged header ignored, /internal 404, unrouted-service 503 | Done |
 | 25 Nov 2026 | Claude | Phase 2: responder-service (atomic assign/release), incident-service (create/list/get/dispatch/resolve, RestClient + circuit breaker + PENDING fallback). Tests: responder 4/4 (10 concurrent assigns -> exactly 3 ambulances, mutation check: test fails without SKIP LOCKED), incident 13/13 (409, refused, 3 s hang, 500, breaker OPEN stops calls). Live via gateway: ASSIGNED, 4th ambulance PENDING, responder killed -> PENDING in ~45 ms, /api/responders 503, login/list still fine, restart + dispatch -> ASSIGNED; DB: incident_user cannot connect to auth_db | Done |
 | 25 Nov 2026 | Claude | Walking skeleton: Dockerfiles, k8s 00-22 + 30, scripts/deploy-minikube.ps1. Fresh namespace -> 6 pods 1/1, 0 restarts. Via port-forward: 401 no token, register/login, MEDICAL ASSIGNED, USER dispatch 403; scale responder to 0 -> PENDING (~1 s first call, then ~40 ms), /api/responders 503, login + list OK; scale to 1 -> dispatch ASSIGNED; deleted Postgres pod -> data kept (3 incidents before/after), auth readiness dipped to 0/1 then recovered. `\l` in the postgres pod shows the 4 databases | Done |
+| 25 Nov 2026 | Claude | Phase 3: incident-service publishes events (19/19 tests), notification-service built (9/9 tests, incl. 8 concurrent copies of one event -> 1 row, malformed -> rejected). Local run with RabbitMQ: notification appears, duplicate eventId ignored, malformed dropped, notifications-down -> events wait then delivered | Done |
+| 25 Nov 2026 | Claude | Phase 4 in Minikube (fresh namespace, full deploy script, exit 0): 7 pods 1/1, 0 restarts. ASSIGNED + notification; duplicate event -> 1 notification; malformed x2 -> queue 0; notification-service scaled to 0 -> rabbitmqctl shows 2 messages / 0 consumers, GET /api/notifications 503, after scale 1 -> 4 notifications, queue 0; responder down -> PENDING + pending notification, dispatch -> assigned notification; RabbitMQ down -> incident still 201 in 58 ms (event lost, trade-off D7); deleted incident/auth/notification/responder/gateway pods -> all recreated, data kept, old JWT still valid; auth checklist 10 cases + 9 extra = 19/19 PASS; only api-gateway is NodePort, all else ClusterIP | Done |
 
 ## Command cheat sheet (demo day)
 

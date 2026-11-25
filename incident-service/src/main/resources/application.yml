@@ -15,6 +15,11 @@ spring:
       ddl-auto: update          # dev/lab only (rule R-DB-1); Flyway is future work
     open-in-view: false
 
+  # RabbitMQ: host/port/user/password come from SPRING_RABBITMQ_* env vars (Spring Boot reads them by itself);
+  # defaults are localhost:5672 guest/guest, which matches docker-compose.
+  rabbitmq:
+    connection-timeout: 2s      # a dead broker must not stall incident creation
+
 # The synchronous dependency: responder-service (Kubernetes DNS name in the cluster)
 responder:
   service:

@@ -7,6 +7,7 @@ import com.resqnet.incident.client.ResponderClient;
 import com.resqnet.incident.dto.CreateIncidentRequest;
 import com.resqnet.incident.dto.IncidentResponse;
 import com.resqnet.incident.exception.ApiException;
+import com.resqnet.incident.messaging.IncidentEventPublisher;
 import com.resqnet.incident.model.Incident;
 import com.resqnet.incident.model.IncidentStatus;
 import com.resqnet.incident.repository.IncidentRepository;
@@ -34,10 +35,13 @@ public class IncidentService {
 
     private final IncidentRepository repository;
     private final ResponderClient responderClient;
+    private final IncidentEventPublisher eventPublisher;
 
-    public IncidentService(IncidentRepository repository, ResponderClient responderClient) {
+    public IncidentService(IncidentRepository repository, ResponderClient responderClient,
+                           IncidentEventPublisher eventPublisher) {
         this.repository = repository;
         this.responderClient = responderClient;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -50,7 +54,14 @@ public class IncidentService {
                 user.id(), user.username()));
         log.info("incidentId={} created by userId={} type={} severity={}",
                 incident.getId(), user.id(), incident.getType(), incident.getSeverity());
-        return IncidentResponse.from(tryAssign(incident));
+        incident = tryAssign(incident);
+        // The incident is saved and committed; now tell notification-service asynchronously (RabbitMQ).
+        if (incident.getStatus() == IncidentStatus.ASSIGNED) {
+            eventPublisher.publishAssigned(incident);
+        } else {
+            eventPublisher.publishPending(incident);
+        }
+        return IncidentResponse.from(incident);
     }
 
     /** Admin retry for a PENDING incident. May still end PENDING if nobody is free or the service is down. */
@@ -60,7 +71,12 @@ public class IncidentService {
         if (incident.getStatus() != IncidentStatus.PENDING) {
             throw invalidState("Only a PENDING incident can be dispatched");
         }
-        return IncidentResponse.from(tryAssign(incident));
+        incident = tryAssign(incident);
+        // Only a success is worth a notification; a failed retry would just repeat "waiting for a responder".
+        if (incident.getStatus() == IncidentStatus.ASSIGNED) {
+            eventPublisher.publishAssigned(incident);
+        }
+        return IncidentResponse.from(incident);
     }
 
     /** Admin closes an ASSIGNED incident: free the responder first, then mark RESOLVED. */
