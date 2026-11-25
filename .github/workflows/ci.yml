@@ -1,0 +1,42 @@
+# Continuous integration: build every service and run its JUnit tests on every push and pull request.
+# Build and test only (no deployment, no secrets). The tests of responder-, incident- and notification-service
+# start a throw-away PostgreSQL with Testcontainers, which works because GitHub's ubuntu runners include Docker.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one failing service must not hide the result of the others
+      matrix:
+        service:
+          - discovery-service
+          - auth-service
+          - responder-service
+          - incident-service
+          - notification-service
+          - api-gateway
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin) with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: ${{ matrix.service }}/pom.xml
+
+      - name: Build and run the tests of ${{ matrix.service }}
+        working-directory: ${{ matrix.service }}
+        run: mvn -B verify

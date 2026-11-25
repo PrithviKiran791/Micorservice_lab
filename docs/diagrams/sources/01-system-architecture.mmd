@@ -1,7 +1,7 @@
 flowchart LR
     client["Client<br/>Postman / PowerShell scripts"]
     subgraph k8s["Minikube - namespace resqnet"]
-        gw["api-gateway :8080<br/>JWT check, routing (lb://), GET retry<br/>the ONLY service exposed"]
+        gw["api-gateway :8080<br/>2 replicas - JWT check, routing (lb://), GET retry<br/>the ONLY service exposed"]
         eureka["discovery-service :8761<br/>Eureka registry<br/>ALL services register here"]
         auth["auth-service :8081"]
         inc["incident-service :8082<br/>2 replicas"]

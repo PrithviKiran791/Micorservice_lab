@@ -3,7 +3,7 @@ flowchart TB
         tools["PowerShell scripts, Postman<br/>http://localhost:8080"] --> pf["kubectl port-forward<br/>svc/api-gateway 8080:8080"]
     end
     subgraph mk["Minikube (docker driver, containerd) - namespace resqnet"]
-        svcgw["Service api-gateway<br/>NodePort 30080<br/>(the only exposed Service)"] --> gw["Deployment api-gateway x1"]
+        svcgw["Service api-gateway<br/>NodePort 30080<br/>(the only exposed Service)"] --> gw["Deployment api-gateway x2"]
         gw --> auth["Deployment auth-service x1<br/>ClusterIP :8081"]
         gw --> inc["Deployment incident-service x2<br/>ClusterIP :8082"]
         gw --> resp["Deployment responder-service x1<br/>ClusterIP :8083"]

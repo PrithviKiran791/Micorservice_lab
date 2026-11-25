@@ -5,7 +5,7 @@ metadata:
   name: api-gateway
   namespace: resqnet
 spec:
-  replicas: 1
+  replicas: 2                        # two gateways: no single point of failure at the entry point (Service api-gateway shares traffic between them)
   selector:
     matchLabels:
       app: api-gateway

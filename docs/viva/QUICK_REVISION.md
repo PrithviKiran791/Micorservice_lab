@@ -7,7 +7,7 @@ Client -> **api-gateway :8080** (JWT check, routes by name via Eureka, retries G
 
 | Service | Port | Database | Job |
 |---|---|---|---|
-| api-gateway | 8080 | - | only entry point, JWT, routing, retry, 503/404 JSON |
+| api-gateway (x2) | 8080 | - | only entry point, JWT, routing, retry, 503/404 JSON |
 | auth-service | 8081 | auth_db | register, login (BCrypt), issue JWT, `/me` |
 | incident-service (x2) | 8082 | incident_db | incidents, sync call, breaker, publish events |
 | responder-service | 8083 | responder_db | responders, atomic assign/release |
@@ -40,7 +40,7 @@ kubectl delete ns resqnet                                       # wipe
 ## Rubric -> where to show it
 | Criterion | Show |
 |---|---|
-| Deployed | `kubectl -n resqnet get pods` (9 pods Running); only gateway is NodePort; `.\scripts\start-public-url.ps1` gives a temporary public https link (Cloudflare quick tunnel to the laptop, not cloud hosting) |
+| Deployed | `kubectl -n resqnet get pods` (10 pods Running: 2 api-gateway, 2 incident-service); only gateway is NodePort; `.\scripts\start-public-url.ps1` gives a temporary public https link (Cloudflare quick tunnel to the laptop, not cloud hosting) |
 | Handles traffic | 2 incident pods; `.\scripts\load-test.ps1`: 1,500 requests all 200, 50/50 split by `X-Served-By`; `.\scripts\demo-failover.ps1` |
 | Database | `psql \l` shows 4 DBs; `incident_user` cannot connect to `auth_db` |
 | Cross-service communication | sync: incident -> responder REST; async: RabbitMQ event -> notification appears |

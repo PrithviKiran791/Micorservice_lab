@@ -46,7 +46,7 @@ Also glance at one `Dockerfile` (`auth-service/Dockerfile`) and `db/init-databas
 
 ## C. Run the demo yourself, twice (30 min)
 
-1. Make sure the cluster is up: `kubectl -n resqnet get pods` (9 pods `1/1`).
+1. Make sure the cluster is up: `kubectl -n resqnet get pods` (10 pods `1/1`).
 2. Follow `docs/demo/DEMO_SCRIPT.md` from the first line, typing every command. Time yourself: target 5 minutes.
 3. Do it a second time without reading, then once with the public link (`.\scripts\start-public-url.ps1`, section "Optional: a public link").
 4. If a step surprises you, read the "If something goes wrong" table at the end of the demo script.

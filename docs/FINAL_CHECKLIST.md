@@ -11,7 +11,7 @@ Status on 25 Nov 2026. "Evidence" points to a file in this repository or a comma
 | 3 | One synchronous REST call and one asynchronous RabbitMQ event, both demonstrated | DONE | `.\scripts\smoke-test.ps1` sections 3 and 4; `docs/diagrams/02-report-incident-sequence.png`, `04-event-flow.png` |
 | 4 | Circuit breaker fallback demonstrated by scaling responder-service to 0 | DONE | `.\scripts\demo-resilience.ps1` (16 checks) |
 | 5 | JWT enforced at the gateway (401/403 cases shown) | DONE | `.\scripts\smoke-test.ps1` (37 checks incl. forged, expired, wrong-secret tokens); `JwtAuthenticationFilterTest` |
-| 6 | All pods Running on Minikube; reachable through the gateway via port-forward | DONE | `kubectl -n resqnet get pods` (9 pods, 0 restarts); `kubectl -n resqnet port-forward svc/api-gateway 8080:8080` |
+| 6 | All pods Running on Minikube; reachable through the gateway via port-forward | DONE | `kubectl -n resqnet get pods` (10 pods, 0 restarts); `kubectl -n resqnet port-forward svc/api-gateway 8080:8080` |
 | 7 | `scripts/` working and tested; Postman collection with tests | DONE | `docs/TEST_REPORT.md` Part B; `postman/ResQNet-Lite.postman_collection.json` (newman: 43 assertions) |
 | 8 | README, VIVA_SCRIPT, QUICK_REVISION, DEMO_SCRIPT, TEST_REPORT, six diagrams | DONE | `README.md`, `docs/viva/`, `docs/demo/DEMO_SCRIPT.md`, `docs/TEST_REPORT.md`, `docs/diagrams/` |
 | 9 | `verify-references.ps1` passes | DONE | 43 of 43 (`docs/viva/CODE_REFERENCES.md`); also `.\scripts\verify-docs.ps1` |
@@ -22,7 +22,7 @@ Status on 25 Nov 2026. "Evidence" points to a file in this repository or a comma
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Deployed (public or lab URL) | DONE with a caveat | 9 pods on Minikube; `.\scripts\start-public-url.ps1` gives a temporary public https link (tunnel to the laptop, **not cloud hosting**); smoke test passed through it; not yet tried from another device |
+| Deployed (public or lab URL) | DONE with a caveat | 10 pods on Minikube; `.\scripts\start-public-url.ps1` gives a temporary public https link (tunnel to the laptop, **not cloud hosting**); smoke test passed through it; not yet tried from another device |
 | Handles traffic | DONE | `.\scripts\load-test.ps1` (1,500 requests, all 200, 50/50 over 2 pods); `.\scripts\demo-failover.ps1` |
 | Database | DONE | see A2 |
 | Cross-service communication | DONE | see A3 |

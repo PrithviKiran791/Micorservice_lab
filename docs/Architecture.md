@@ -44,7 +44,7 @@ Not drawn above: **discovery-service** (Eureka registry, :8761). Every service r
 
 | Service | Port | Database | Responsibility |
 |---|---|---|---|
-| api-gateway | 8080 | none | Single entry point; validates JWT; routes `/api/**` by service name (`lb://`); retries failed GETs; sets identity headers; never routes `/internal/**` |
+| api-gateway (2 replicas) | 8080 | none | Single entry point (one address, two pods); validates JWT; routes `/api/**` by service name (`lb://`); retries failed GETs; sets identity headers; never routes `/internal/**` |
 | auth-service | 8081 | `auth_db` | Register, login, issue JWT, seed admin |
 | incident-service (2 replicas) | 8082 | `incident_db` | Incident lifecycle; sync call to responder-service; circuit breaker; publishes events |
 | responder-service | 8083 | `responder_db` | Responder catalogue and availability; atomic assignment and release |
@@ -143,7 +143,8 @@ Login, list incidents and notifications continue to work because they do not dep
 | incident-service pod restarts | State is in Postgres; Kubernetes restarts the pod |
 | One copy of a service dies (e.g. one of two incident-service pods) | Gateway retries failed GET requests on another copy (up to 2 retries, 1 s connect timeout, 8 s response timeout); POST is never retried automatically. Measured: pod deleted under traffic, 114 of 114 GET requests returned 200, slowest 1.08 s (before the retry: 9 failures including a 30 s hang) |
 | discovery-service down | Services keep using their cached copy of the registry for a while; new or dead instances are not noticed until it returns (by design, not tested) |
-| Gateway down | Everything unreachable (single entry point; a second replica is possible but not deployed) |
+| One of the 2 gateway pods dies | The Service `api-gateway` sends traffic to the other pod. Measured through the NodePort Service tunnel: 107 of 107 requests returned 200 while a gateway pod was deleted and replaced (a `kubectl port-forward` is tied to one pod, so it does not show this) |
+| Both gateway pods down | Everything unreachable until Kubernetes restarts them |
 
 Kubernetes provides self-healing (restarts failed containers) and readiness probes so traffic only
 reaches pods that are ready.

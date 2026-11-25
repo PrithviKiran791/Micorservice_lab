@@ -16,7 +16,7 @@ The lab slide lists eight criteria. Honest status of each:
 
 | Criterion | What proves it | Status |
 |---|---|---|
-| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`), reachable from a public link | **Done (tunnel).** 9 pods on Minikube. `scripts/start-public-url.ps1` opens a temporary public HTTPS link (free Cloudflare quick tunnel) to the gateway; the full smoke test (37 checks) passed through that public link. It is a tunnel to the laptop, **not cloud hosting**: the link changes each time and works only while the laptop is on. |
+| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`), reachable from a public link | **Done (tunnel).** 10 pods on Minikube. `scripts/start-public-url.ps1` opens a temporary public HTTPS link (free Cloudflare quick tunnel) to the gateway; the full smoke test (37 checks) passed through that public link. It is a tunnel to the laptop, **not cloud hosting**: the link changes each time and works only while the laptop is on. |
 | **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Done.** `scripts/load-test.ps1`: 20 simultaneous users, 1,500 requests, all HTTP 200, about 130-150 requests/second, average 134-153 ms, p95 about 270-295 ms, and `/api/incidents` shared exactly 50% / 50% by the two `incident-service` pods (two clean-cluster runs). |
 | **Database** | One PostgreSQL server, **four databases, four users**; a user cannot even connect to another service's database | Done and verified |
 | **Cross-service communication** | **Synchronous:** incident-service calls responder-service (REST). **Asynchronous:** incident-service publishes events to RabbitMQ, notification-service consumes them | Done and verified |
@@ -57,7 +57,7 @@ The lab slide lists eight criteria. Honest status of each:
 
 | Service | Port | Database | Job |
 |---|---|---|---|
-| `api-gateway` | 8080 | none | Single entry point. Verifies the JWT, strips forged identity headers, routes `/api/**` to services by name. Never routes `/internal/**`. |
+| `api-gateway` (2 replicas) | 8080 | none | Single entry point. Verifies the JWT, strips forged identity headers, routes `/api/**` to services by name. Never routes `/internal/**`. |
 | `auth-service` | 8081 | `auth_db` | Register, login (BCrypt), issues HS256 JWTs, seeds a demo admin |
 | `incident-service` | 8082 | `incident_db` | Incident lifecycle; calls responder-service; circuit breaker + fallback; publishes events |
 | `responder-service` | 8083 | `responder_db` | Responder catalogue; **atomic** assignment and release |
@@ -259,7 +259,7 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
 | [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
 | [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
-| [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 35 likely questions with answers |
+| [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 36 likely questions with answers |
 | [`docs/viva/QUICK_REVISION.md`](docs/viva/QUICK_REVISION.md) | one-page revision sheet |
 | [`docs/viva/STUDY_PLAN.md`](docs/viva/STUDY_PLAN.md) | 3-hour plan: big picture, IntelliJ code tour (12 stops), demo practice, questions out loud, "what if" drills |
 | [`docs/FINAL_CHECKLIST.md`](docs/FINAL_CHECKLIST.md) | final deliverables and the eight lab criteria with evidence; owner actions |

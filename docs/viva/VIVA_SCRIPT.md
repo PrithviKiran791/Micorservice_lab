@@ -21,7 +21,7 @@ system shows **one synchronous call** (REST) and **one asynchronous event** (Rab
 ### A2. Three-minute version (add these points)
 
 1. **Problem:** in a monolith, one failure stops everything. Dispatching needs several independent jobs (login, recording incidents, finding responders, notifying), so I split them into services that can fail and scale independently.
-2. **Services:** `api-gateway` (8080), `auth-service` (8081), `incident-service` (8082, two copies), `responder-service` (8083), `notification-service` (8084), `discovery-service` (Eureka, 8761), plus PostgreSQL and RabbitMQ.
+2. **Services:** `api-gateway` (8080, two copies), `auth-service` (8081), `incident-service` (8082, two copies), `responder-service` (8083), `notification-service` (8084), `discovery-service` (Eureka, 8761), plus PostgreSQL and RabbitMQ.
 3. **Communication:** the incident service calls the responder service **synchronously** because the reporter needs the answer (`ASSIGNED` or `PENDING`) immediately. It sends a notification **asynchronously** through RabbitMQ because a notification is a side effect that must never slow down or break dispatch.
 4. **Resilience:** timeouts, a **circuit breaker** and a **fallback** turn "responder is down" into a `PENDING` incident. The gateway also **retries GET requests** on another copy when one copy dies.
 5. **Security:** the JWT is checked **only at the gateway**. Services trust the identity headers the gateway adds, and only the gateway is reachable from outside the cluster.
@@ -37,12 +37,12 @@ system shows **one synchronous call** (REST) and **one asynchronous event** (Rab
 
 ## B. Demonstration (what to type, what you will see)
 
-Start state: `kubectl -n resqnet get pods` shows 9 pods `1/1 Running`. The timed 5-minute version is in
+Start state: `kubectl -n resqnet get pods` shows 10 pods `1/1 Running`. The timed 5-minute version is in
 [`docs/demo/DEMO_SCRIPT.md`](../demo/DEMO_SCRIPT.md). The short version with expected results:
 
 | Step | Command / action | Expected result | What to say |
 |---|---|---|---|
-| 1 | `kubectl -n resqnet get pods` | 9 pods, all `1/1 Running` (two `incident-service`) | "Everything runs in one namespace on Minikube." |
+| 1 | `kubectl -n resqnet get pods` | 10 pods, all `1/1 Running` (two `api-gateway`, two `incident-service`) | "Everything runs in one namespace on Minikube." |
 | 2 | `kubectl -n resqnet port-forward svc/api-gateway 8080:8080` (keep open) | `Forwarding from 127.0.0.1:8080` | "Only the gateway is exposed; I tunnel to it." |
 | 3 | `GET http://localhost:8080/api/incidents` with no token | **401** `UNAUTHORIZED` | "Authentication is checked at the gateway. The request never reached a service." |
 | 4 | Register `asha` / `Pass@1234`, then login | 201, then 200 with a token | "BCrypt password, JWT signed with a shared secret." |
@@ -233,6 +233,8 @@ kubectl delete ns resqnet                                 # wipe everything; the
 29. **What are probes?** Startup (give the JVM time to boot), liveness (restart if dead), readiness (only send traffic when ready; includes the database check). All use `/actuator/health/...`.
 30. **How did you test?** 51 JUnit tests (Mockito and real PostgreSQL through Testcontainers) in `auth-service` (5), `api-gateway` (14), `responder-service` (4), `incident-service` (19), `notification-service` (9). On the cluster: `smoke-test.ps1` (37 checks), `demo-resilience.ps1` (16), `demo-failover.ps1` (7), Postman via newman (43 assertions), `load-test.ps1`, all started from a deleted namespace by `scripts/rehearsal.ps1`.
 35. **Is it hosted in the cloud?** No. Everything runs on my laptop in Minikube. For the public-URL requirement I use a free Cloudflare quick tunnel (`scripts/start-public-url.ps1`) that gives a temporary `https://....trycloudflare.com` link to the gateway; I ran the full smoke test (37 checks) through that link. The limits: the link changes every time, it works only while the laptop is on, and anyone with the link can use the demo (including the demo admin login), so I open it only during the demo.
+36. **What if the gateway dies?** The gateway runs as two pods behind one Kubernetes Service, so traffic goes to the surviving pod and Kubernetes starts a replacement. I measured it through the NodePort Service tunnel: 107 of 107 requests returned 200 while one gateway pod was deleted. If both pods die, everything is unreachable until Kubernetes restarts them. (A kubectl port-forward is tied to one pod, so after deleting that pod I must start it again.)
+
 **Spring Boot basics that may come up**
 
 31. **`@RestController`, `@Service`, `@Repository`, `@Transactional`?** Controller returns JSON; service holds business logic; repository talks to the database (Spring Data JPA builds queries from method names); `@Transactional` makes a method one all-or-nothing database transaction.

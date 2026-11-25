@@ -4,7 +4,7 @@
 
 1. Close heavy applications (browser tabs, chat apps). The laptop needs free memory for Docker and Minikube.
 2. Start Docker Desktop, then: `minikube start --driver=docker --cpus=4 --memory=4096` (skip if already running).
-3. Deploy (or confirm): `.\scripts\deploy-minikube.ps1` and wait for it to print the pod list. Check: `kubectl -n resqnet get pods` shows 9 pods `1/1 Running`.
+3. Deploy (or confirm): `.\scripts\deploy-minikube.ps1` and wait for it to print the pod list. Check: `kubectl -n resqnet get pods` shows 10 pods `1/1 Running`.
 4. **Terminal 1** (leave open): `kubectl -n resqnet port-forward svc/api-gateway 8080:8080`
 5. **Terminal 2** (you type here). Paste this helper once:
 
@@ -27,7 +27,7 @@ Backup: if anything fails live, run `.\scripts\demo-resilience.ps1` (it performs
 
 | Time | What you do | What you type | What happens | What you say | Responsible code |
 |---|---|---|---|---|---|
-| 0:00 | Show the cluster | `kubectl -n resqnet get pods` | 9 pods `1/1 Running`, two `incident-service` | "Six Spring Boot services, Postgres and RabbitMQ run as pods on Minikube. Incident-service has two copies." | `k8s/*.yaml`, `scripts/deploy-minikube.ps1` |
+| 0:00 | Show the cluster | `kubectl -n resqnet get pods` | 10 pods `1/1 Running`, two `api-gateway` and two `incident-service` | "Six Spring Boot services, Postgres and RabbitMQ run as pods on Minikube. The gateway and the incident service each run two copies." | `k8s/*.yaml`, `scripts/deploy-minikube.ps1` |
 | 0:30 | Security: no token | `Call GET /api/incidents` | `HTTP 401 ... Unauthorized` | "Authentication is checked at the gateway. This request never reached a service." | `JwtAuthenticationFilter` (api-gateway, `security` package) |
 | 0:50 | Register and log in | `Call POST /api/auth/register @{username="asha";password="Pass@1234"}` then `$t = (Call POST /api/auth/login @{username="asha";password="Pass@1234"}).token` | user created (role `USER`), token stored | "Password is stored as a BCrypt hash. The login returns a signed JWT." (If `asha` exists, use another name.) | `AuthService`, `JwtService` (auth-service, `service` package) |
 | 1:20 | Report an incident (SYNC call) | `Call POST /api/incidents @{type="MEDICAL";severity="CRITICAL";description="Person collapsed near library";locationText="Main Library, Gate 2"} $t` | `status ASSIGNED`, `assignedResponder` = an ambulance | "Incident-service saved it, then called responder-service synchronously. The responder service locked one free row so two reports can never get the same ambulance." | `ResponderClient` (incident-service), `ResponderRepository` (responder-service) |

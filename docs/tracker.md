@@ -92,7 +92,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [x] Full rehearsal passed 4 times from a clean cluster (`scripts/rehearsal.ps1`, last one with `-Rebuild`; logs in `docs/evidence/`); the human script is `docs/demo/DEMO_SCRIPT.md` (followed once from the first line on the live cluster)
 - [ ] Backup: screenshots or a short screen recording of a successful run (**owner**: needs your screen; text evidence is in `docs/evidence/`)
 - [x] Architecture diagrams: six PNGs with Mermaid sources in `docs/diagrams/` (slide = `01-system-architecture.png`)
-- [x] Teacher Q&A: `docs/viva/VIVA_SCRIPT.md` section G (35 questions) and `docs/Architecture.md` section 15
+- [x] Teacher Q&A: `docs/viva/VIVA_SCRIPT.md` section G (36 questions) and `docs/Architecture.md` section 15
 - [ ] Laptop prepared: charged, Docker Desktop and Minikube already started, other apps closed (**owner**)
 
 ## Stretch (only if every MVP item above is done)
