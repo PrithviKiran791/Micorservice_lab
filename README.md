@@ -16,7 +16,7 @@ The lab slide lists eight criteria. Honest status of each:
 
 | Criterion | What proves it | Status |
 |---|---|---|
-| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`) | Done on the laptop's Minikube. **Not** reachable from a public/lab URL yet (only via `kubectl port-forward`). |
+| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`), reachable from a public link | **Done (tunnel).** 9 pods on Minikube. `scripts/start-public-url.ps1` opens a temporary public HTTPS link (free Cloudflare quick tunnel) to the gateway; the full smoke test (37 checks) passed through that public link. It is a tunnel to the laptop, **not cloud hosting**: the link changes each time and works only while the laptop is on. |
 | **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Done.** `scripts/load-test.ps1`: 20 simultaneous users, 1,500 requests, all HTTP 200, about 130-150 requests/second, average 134-153 ms, p95 about 270-295 ms, and `/api/incidents` shared exactly 50% / 50% by the two `incident-service` pods (two clean-cluster runs). |
 | **Database** | One PostgreSQL server, **four databases, four users**; a user cannot even connect to another service's database | Done and verified |
 | **Cross-service communication** | **Synchronous:** incident-service calls responder-service (REST). **Asynchronous:** incident-service publishes events to RabbitMQ, notification-service consumes them | Done and verified |
@@ -141,6 +141,15 @@ kubectl -n resqnet exec deploy/postgres -- psql -U postgres -c "\l"   # shows th
 kubectl delete ns resqnet                                         # wipe everything for a clean start
 ```
 
+### C) A public link for the demo (temporary tunnel to the laptop)
+
+```powershell
+.\scripts\start-public-url.ps1            # prints https://<random-words>.trycloudflare.com ; Ctrl+C closes it
+.\scripts\start-public-url.ps1 -Minutes 30
+.\scripts\start-public-url.ps1 -Check     # opens the link, runs scripts\smoke-test.ps1 through it, closes it
+```
+
+It uses a free Cloudflare "quick tunnel" (`tools\cloudflared\cloudflared.exe`, official release, checksum and signature checked, not stored in Git). Be aware: **anyone with the link can use the system, including the demo admin login** (`admin` / `Admin@123`), so open it only for the demo and close it afterwards. The address is new every time. This is a tunnel to Minikube running on your laptop; the laptop must stay on and connected.
 ### B) Locally without Kubernetes
 
 ```powershell
@@ -273,11 +282,11 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | `scripts/demo-failover.ps1` | delete one of two incident-service pods under traffic; every GET must still return 200 |
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
+| `scripts/start-public-url.ps1` | temporary public HTTPS link (Cloudflare quick tunnel) to the gateway on the laptop; `-Check` runs the smoke test through it |
 | `scripts/run-unit-tests.ps1` | all 51 JUnit tests with a summary table |
 | `scripts/verify-docs.ps1` | checks that every file, link, script option, class.method and Kubernetes name mentioned in the documents exists |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 
 Still to do (tracked in `docs/tracker.md`):
-- a public or lab URL for the "Deployed" row (needs a tunnel tool or exposing the port on the lab network, which requires the owner's approval)
 - the optional admin endpoints for responders (create, set OFFLINE) were not built
 - a last full rehearsal on the evaluation machine (`.\scripts\rehearsal.ps1 -Rebuild`) and the owner's own check of the items listed under "NOT independently verified" in `docs/TEST_REPORT.md`

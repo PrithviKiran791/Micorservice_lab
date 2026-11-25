@@ -232,7 +232,7 @@ kubectl delete ns resqnet                                 # wipe everything; the
 28. **How did the images get into Minikube?** This Minikube uses the containerd runtime, so `minikube docker-env` does not work. `scripts/deploy-minikube.ps1` builds with Docker Desktop and runs `minikube image load`.
 29. **What are probes?** Startup (give the JVM time to boot), liveness (restart if dead), readiness (only send traffic when ready; includes the database check). All use `/actuator/health/...`.
 30. **How did you test?** 51 JUnit tests (Mockito and real PostgreSQL through Testcontainers) in `auth-service` (5), `api-gateway` (14), `responder-service` (4), `incident-service` (19), `notification-service` (9). On the cluster: `smoke-test.ps1` (37 checks), `demo-resilience.ps1` (16), `demo-failover.ps1` (7), Postman via newman (43 assertions), `load-test.ps1`, all started from a deleted namespace by `scripts/rehearsal.ps1`.
-
+35. **Is it hosted in the cloud?** No. Everything runs on my laptop in Minikube. For the public-URL requirement I use a free Cloudflare quick tunnel (`scripts/start-public-url.ps1`) that gives a temporary `https://....trycloudflare.com` link to the gateway; I ran the full smoke test (37 checks) through that link. The limits: the link changes every time, it works only while the laptop is on, and anyone with the link can use the demo (including the demo admin login), so I open it only during the demo.
 **Spring Boot basics that may come up**
 
 31. **`@RestController`, `@Service`, `@Repository`, `@Transactional`?** Controller returns JSON; service holds business logic; repository talks to the database (Spring Data JPA builds queries from method names); `@Transactional` makes a method one all-or-nothing database transaction.
@@ -244,6 +244,6 @@ kubectl delete ns resqnet                                 # wipe everything; the
 
 ## H. Honest limitations and what I would improve
 
-- **Not built:** a public or lab URL (the demo is reachable through `kubectl port-forward` on the laptop), admin endpoints to create responders or set them offline, an outbox pattern, Flyway, a dead-letter queue, NetworkPolicy, HTTPS.
+- **Not built:** real cloud hosting (the public link is a temporary Cloudflare quick tunnel to the laptop, started with `scripts/start-public-url.ps1`), admin endpoints to create responders or set them offline, an outbox pattern, Flyway, a dead-letter queue, NetworkPolicy, HTTPS.
 - **Known behaviour:** a POST sent in the very second a pod dies can fail once (not retried on purpose); a lost event if RabbitMQ is down; the gateway sees a restarted service a few seconds late because its registry copy refreshes every 5 s.
 - **Would improve:** outbox pattern, one Postgres per service, Flyway, mTLS/NetworkPolicy, autoscaling, rate limiting, refresh tokens.

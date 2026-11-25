@@ -7,3 +7,4 @@ target/
 Documents/*.exe
 Documents/*.zip
 Micorservice_lab/
+tools/

@@ -54,6 +54,17 @@ If the PENDING dispatch at 4:10 answers `PENDING` again, the gateway or the circ
 | RabbitMQ UI | `kubectl -n resqnet port-forward svc/rabbitmq 15672:15672`, open `http://localhost:15672` (user `resqnet`, password `rabbit-demo`) | queue `notification.incidents` with 1 consumer | "This is the broker that carries the asynchronous events." |
 | Everything automatically | `.\scripts\rehearsal.ps1` (about 5 minutes, deletes and rebuilds the namespace) | summary table ends with `REHEARSAL PASSED` | "All checks pass from a clean cluster." |
 
+
+## Optional: a public link for the examiner (about 1 minute to set up)
+
+Only if the evaluation asks for a URL "not just localhost". It is a temporary tunnel to your laptop, not cloud hosting; anyone with the link can use the system (including the demo admin login), so close it afterwards.
+
+| Step | Command | Expected |
+|---|---|---|
+| Open | `.\scripts\start-public-url.ps1` (leave the window open; it runs its own port-forward, so you do not need Terminal 1) | prints `PUBLIC URL:  https://<random-words>.trycloudflare.com` |
+| Use | replace `$b = "http://localhost:8080"` in the helper by the printed address and run the same demo commands | same results as above |
+| Check | open `<public url>/actuator/health` in a browser | `{"status":"UP","groups":["liveness","readiness"]}` |
+| Close | press Ctrl+C in that window | `Tunnel closed.` |
 ## If something goes wrong
 
 | Problem | Fix |

@@ -40,7 +40,7 @@ kubectl delete ns resqnet                                       # wipe
 ## Rubric -> where to show it
 | Criterion | Show |
 |---|---|
-| Deployed | `kubectl -n resqnet get pods` (9 pods Running); only gateway is NodePort. *(No public URL: port-forward on the laptop.)* |
+| Deployed | `kubectl -n resqnet get pods` (9 pods Running); only gateway is NodePort; `.\scripts\start-public-url.ps1` gives a temporary public https link (Cloudflare quick tunnel to the laptop, not cloud hosting) |
 | Handles traffic | 2 incident pods; `.\scripts\load-test.ps1`: 1,500 requests all 200, 50/50 split by `X-Served-By`; `.\scripts\demo-failover.ps1` |
 | Database | `psql \l` shows 4 DBs; `incident_user` cannot connect to `auth_db` |
 | Cross-service communication | sync: incident -> responder REST; async: RabbitMQ event -> notification appears |
@@ -59,4 +59,4 @@ kubectl delete ns resqnet                                       # wipe
 7. 409 "none free" is not a breaker failure; both end in `PENDING`.
 8. Idempotent consumer: `eventId` unique; duplicates skipped; bad messages rejected without requeue.
 9. Eureka + load balancer: round-robin over copies; gateway retries GET only (never POST).
-10. Everything proven from a clean cluster by `scripts/rehearsal.ps1`; honest limits: no public URL, no outbox (a lost event if RabbitMQ is down), demo secrets, no HTTPS.
+10. Everything proven from a clean cluster by `scripts/rehearsal.ps1`; honest limits: the public link is only a tunnel to the laptop, no outbox (a lost event if RabbitMQ is down), demo secrets, no HTTPS.
