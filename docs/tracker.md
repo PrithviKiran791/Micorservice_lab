@@ -28,8 +28,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 - [x] WSL2 + Ubuntu installed
 - [x] Docker Desktop installed; engine running; `docker run hello-world` works
-- [x] JDK 17 (`java -version` shows 17)
-- [x] Maven (`mvn -version` shows Java 17)
+- [x] JDK 17 installed (not on PATH; default is 25, so JAVA_HOME is set per build command)
+- [x] Maven 3.10.2 (builds verified with JAVA_HOME=JDK 17)
 - [x] Git
 - [x] kubectl + Minikube installed; `minikube start --driver=docker --cpus=4 --memory=4096`; `kubectl get nodes` is `Ready`
 - [ ] IntelliJ IDEA (or VS Code with Java extensions) and Postman
