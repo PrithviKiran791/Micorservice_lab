@@ -6,7 +6,9 @@ import { Card } from '../components/common/Card'
 import { IncidentTypeLabel, SeverityBadge, StatusBadge } from '../components/common/Badge'
 import { PageHeader } from '../components/common/PageHeader'
 import { IncidentForm } from '../components/incidents/IncidentForm'
+import { HoverBorderGradient } from '../components/ui/hover-border-gradient'
 import type { Incident } from '../types/api'
+import { formatCoordinates, incidentCoordinates } from '../utils/geo'
 
 export default function ReportEmergency() {
   const [created, setCreated] = useState<Incident | null>(null)
@@ -30,16 +32,27 @@ export default function ReportEmergency() {
               <IncidentTypeLabel type={created.type} />
             </div>
 
+            <p className="mt-4 text-xs text-mute">
+              {incidentCoordinates(created)
+                ? `Position saved with the report: ${formatCoordinates(incidentCoordinates(created)!)}`
+                : 'No map position was sent; the report has the text description only.'}
+            </p>
+
             <p className="mt-5 max-w-md text-sm text-ink">
               {assigned
                 ? `${created.assignedResponder?.name} has been assigned to your incident.`
                 : 'No responder could be assigned right now (none is free, or the responder service is unreachable). Your report is safely in the queue and a dispatcher will assign help as soon as it is available.'}
             </p>
 
-            <div className="mt-7 flex flex-wrap justify-center gap-3">
-              <Link to={`/app/incidents?open=${created.id}`} className="inline-flex h-10 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">
-                Track this incident
-              </Link>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+              <HoverBorderGradient
+                as={Link}
+                to={`/app/incidents?open=${created.id}`}
+                containerClassName="rounded-full"
+                className="h-10 px-5 text-sm font-medium"
+              >
+                <span>Track this incident</span>
+              </HoverBorderGradient>
               <Button variant="secondary" onClick={() => setCreated(null)}>
                 Report another
               </Button>
@@ -56,7 +69,7 @@ export default function ReportEmergency() {
       <Card className="mx-auto max-w-2xl">
         <IncidentForm onCreated={setCreated} />
       </Card>
-      <p className="mx-auto mt-4 max-w-2xl text-xs text-faint">This is a simulation for a college project. In a real emergency, call your local emergency number.</p>
+      <p className="mx-auto mt-4 max-w-2xl text-xs text-slate-300/75">This is a simulation for a college project. In a real emergency, call your local emergency number.</p>
     </>
   )
 }

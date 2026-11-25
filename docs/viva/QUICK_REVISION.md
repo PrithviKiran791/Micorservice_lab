@@ -33,7 +33,7 @@ kubectl -n resqnet logs deploy/incident-service --tail=30
 kubectl -n resqnet exec deploy/postgres -- psql -U postgres -c "\l"
 .\scripts\smoke-test.ps1 ; .\scripts\demo-resilience.ps1 ; .\scripts\demo-failover.ps1 ; .\scripts\load-test.ps1
 .\scripts\rehearsal.ps1                                         # everything from a clean cluster
-.\scripts\run-unit-tests.ps1                                    # 67 JUnit tests
+.\scripts\run-unit-tests.ps1                                    # 69 JUnit tests
 kubectl delete ns resqnet                                       # wipe
 ```
 
@@ -47,7 +47,7 @@ kubectl delete ns resqnet                                       # wipe
 | Resilience | scale responder to 0: incident `PENDING`, login/notifications still work |
 | Service discovery and gateway | Eureka dashboard `:8761`, routes `lb://...` in `GatewayRoutes` |
 | Security | no token -> 401; USER on dispatch -> 403; forged header ignored |
-| Testing | 67 JUnit tests + scripts + Postman (`docs/TEST_REPORT.md`) |
+| Testing | 69 JUnit tests + scripts + Postman (`docs/TEST_REPORT.md`) |
 
 ## 10 key talking points
 1. Five business services + registry; each service owns its database and its code (no shared library).

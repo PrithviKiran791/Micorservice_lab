@@ -27,7 +27,7 @@ Every row gives the file, the exact line number and the code snippet found there
 | Timeouts make a dead service fail fast | `incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:36` | `factory.setReadTimeout(readTimeoutMs);` | RestClientConfig.responderRestClient | Resilience |
 | Save first, call the remote service later (no remote call inside a DB transaction) | `incident-service/src/main/java/com/resqnet/incident/service/IncidentService.java:52` | `Incident incident = repository.save(new Incident(` | IncidentService.create | Resilience |
 | The synchronous call itself | `incident-service/src/main/java/com/resqnet/incident/service/IncidentService.java:121` | `responderClient.assign(new AssignRequest(` | IncidentService.tryAssign | Cross-service |
-| Test: responder hangs, fallback within 3 s | `incident-service/src/test/java/com/resqnet/incident/service/IncidentFlowTest.java:161` | `void responderHangs_readTimeoutTriggersFallbackWithinAboutThreeSeconds()` | IncidentFlowTest | Testing |
+| Test: responder hangs, fallback within 3 s | `incident-service/src/test/java/com/resqnet/incident/service/IncidentFlowTest.java:187` | `void responderHangs_readTimeoutTriggersFallbackWithinAboutThreeSeconds()` | IncidentFlowTest | Testing |
 
 ## JWT at the gateway (api-gateway)
 

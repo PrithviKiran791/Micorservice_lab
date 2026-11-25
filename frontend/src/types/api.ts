@@ -67,6 +67,9 @@ export interface CreateIncidentRequest {
   severity: Severity
   description: string
   locationText: string
+  /** Optional (see docs/API_CONTRACT.md): -90..90 and -180..180, 6 decimals. Sent only together. */
+  latitude?: number
+  longitude?: number
 }
 
 // ---- responders ---------------------------------------------------------------------------------------------------

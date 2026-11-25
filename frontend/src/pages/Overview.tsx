@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, InlineNotice, LoadingState } from '../component
 import { IncidentDetail } from '../components/incidents/IncidentDetail'
 import { IncidentTable } from '../components/incidents/IncidentTable'
 import { NotificationList } from '../components/notifications/NotificationList'
+import { HoverBorderGradient } from '../components/ui/hover-border-gradient'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../contexts/NotificationsContext'
 import { useResource } from '../hooks/useResource'
@@ -38,9 +39,16 @@ export default function Overview() {
         actions={
           <>
             <LiveStatus resource={incidents} />
-            <Link to="/app/report" className="inline-flex h-10 items-center gap-2 rounded-md bg-critical px-4 text-sm font-semibold text-white hover:bg-red-600">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Report emergency
-            </Link>
+            <HoverBorderGradient
+              as={Link}
+              to="/app/report"
+              highlightColor="#ef4444"
+              containerClassName="rounded-full"
+              className="h-10 px-4 text-sm font-semibold"
+            >
+              <Plus className="h-4 w-4 text-critical" aria-hidden="true" />
+              <span>Report emergency</span>
+            </HoverBorderGradient>
           </>
         }
       />
@@ -77,7 +85,17 @@ export default function Overview() {
               icon={ClipboardList}
               title="You have not reported any incident yet"
               message="When you report an emergency it appears here with its status."
-              action={<Link to="/app/report" className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Report an emergency</Link>}
+              action={
+                <HoverBorderGradient
+                  as={Link}
+                  to="/app/report"
+                  highlightColor="#ef4444"
+                  containerClassName="rounded-full"
+                  className="h-9 px-4 text-sm font-medium"
+                >
+                  <span>Report an emergency</span>
+                </HoverBorderGradient>
+              }
             />
           ) : (
             <IncidentTable incidents={recent} onSelect={(i) => setSelectedId(i.id)} />

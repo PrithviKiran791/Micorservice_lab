@@ -1,6 +1,6 @@
-# mvn -B clean test in notification-service (JDK 17), 25 Nov 2026 18:52
+# mvn -B clean test in notification-service (JDK 17), 25 Nov 2026 20:13
 [INFO] Building notification-service 1.0
 [INFO] Running com.resqnet.notification.service.NotificationServiceTest
-[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 18.06 s -- in com.resqnet.notification.service.NotificationServiceTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 21.12 s -- in com.resqnet.notification.service.NotificationServiceTest
 [INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS

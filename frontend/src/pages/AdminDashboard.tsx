@@ -11,7 +11,8 @@ import { IncidentDetailLoader } from '../components/incidents/IncidentDetailLoad
 import { HealthStrip } from '../components/ops/HealthPanels'
 import { SourceTag } from '../components/ops/StatusPill'
 import { IncidentTable } from '../components/incidents/IncidentTable'
-import { AvailabilitySummary } from '../components/responders/AvailabilitySummary'
+import { OperationsMap } from '../components/map/OperationsMap'
+import { ResponderPanel } from '../components/map/ResponderPanel'
 import { useToast } from '../contexts/ToastContext'
 import { useIncidentActions } from '../hooks/useIncidentActions'
 import { useResource } from '../hooks/useResource'
@@ -23,7 +24,7 @@ import type { OpsHealth } from '../types/ops'
 import { timeAgo } from '../utils/format'
 import { responderAvailability, summarize } from '../utils/stats'
 
-/** The dispatcher's operations view: queue of pending incidents, incident management, responders and key numbers. */
+/** The dispatcher's operations view: key numbers, the incident map, the pending queue, incident management and responders. */
 export default function AdminDashboard() {
   const incidents = useResource<Incident[]>((signal) => incidentService.list(undefined, signal))
   const responders = useResource<Responder[]>((signal) => responderService.list(undefined, signal))
@@ -50,7 +51,6 @@ export default function AdminDashboard() {
   
   const availability = responders.data ? responderAvailability(responders.data) : null
   const incidentById = useMemo(() => new Map(list.map((i) => [i.id, i])), [list])
-  const busyResponders = (responders.data ?? []).filter((r) => r.status === 'BUSY')
 
   const resolvedShare = summary.total > 0 ? Math.round((summary.resolved / summary.total) * 100) : 0
   const last24h = list.filter((i) => Date.now() - new Date(i.createdAt).getTime() <= 24 * 3_600_000).length
@@ -94,20 +94,25 @@ export default function AdminDashboard() {
         <Card className="mb-6"><ErrorState error={incidents.error} onRetry={() => void incidents.reload()} title="Could not load incidents" /></Card>
       )}
 
-      <Card className="mb-6" title="Platform health" subtitle="Real health of every service, read by the gateway" actions={<><SourceTag kind="live" /><Link to="/app/health" className="text-sm font-medium text-brand hover:underline">Service health</Link></>}>
-        {ops.data ? <HealthStrip health={ops.data} /> : ops.error ? <p className="text-sm text-amber">Health could not be read: {ops.error.message}</p> : <p className="text-sm text-mute">Checking services...</p>}
-      </Card>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total incidents" value={v(summary.total)} icon={ClipboardList} />
-        <StatCard label="Pending queue" value={v(summary.pending)} icon={Clock3} tone="amber" />
-        <StatCard label="Assigned" value={v(summary.assigned)} icon={UserCheck} tone="ok" />
-        <StatCard label="Resolved" value={v(summary.resolved)} icon={CheckCircle2} />
         <StatCard label="Critical, open" value={v(summary.openCritical)} icon={AlertOctagon} tone={summary.openCritical > 0 ? 'critical' : 'neutral'} />
+        <StatCard label="Pending" value={v(summary.pending)} icon={Clock3} tone="amber" />
+        <StatCard label="Assigned" value={v(summary.assigned)} icon={UserCheck} tone="ok" />
+        <StatCard label="Available responders" value={availability ? `${availability.byStatus.AVAILABLE}/${availability.total}` : '-'} icon={Truck} tone="ok" hint={availability ? undefined : 'Unavailable, not zero'} />
+      </div>
+
+      <OperationsMap incidents={incidents} />
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <StatCard label="Resolved" value={v(summary.resolved)} icon={CheckCircle2} />
         <StatCard label="Total responders" value={availability ? availability.total : '-'} icon={Truck} hint={availability ? undefined : 'Unavailable, not zero'} />
-        <StatCard label="Available responders" value={availability ? availability.byStatus.AVAILABLE : '-'} icon={UserCheck} tone="ok" hint={availability ? undefined : 'Unavailable, not zero'} />
         <StatCard label="Busy responders" value={availability ? availability.byStatus.BUSY : '-'} icon={Truck} tone="amber" hint={availability ? undefined : 'Unavailable, not zero'} />
       </div>
+
+      <Card className="mt-6" title="Platform health" subtitle="Real health of every service, read by the gateway" actions={<><SourceTag kind="live" /><Link to="/app/health" className="text-sm font-medium text-brand hover:underline">Service health</Link></>}>
+        {ops.data ? <HealthStrip health={ops.data} /> : ops.error ? <p className="text-sm text-amber">Health could not be read: {ops.error.message}</p> : <p className="text-sm text-mute">Checking services...</p>}
+      </Card>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card
@@ -135,19 +140,11 @@ export default function AdminDashboard() {
             </dl>
           </Card>
 
-          <Card title="Responder availability" actions={<Link to="/app/responders" className="text-sm font-medium text-brand hover:underline">Details</Link>}>
-            {responders.loading ? (
-              <LoadingState label="Loading responders..." />
-            ) : responders.data ? (
-              <AvailabilitySummary responders={responders.data} />
-            ) : (
-              <p className="text-sm text-mute">Responder data is unavailable right now.</p>
-            )}
-          </Card>
+          <ResponderPanel responders={responders.data} unavailable={responders.error !== null} incidentById={incidentById} />
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[2fr_1fr]">
+      <div className="mt-6">
         <Card title="Incident management" subtitle="Latest 8 incidents" actions={<Link to="/app/incidents" className="text-sm font-medium text-brand hover:underline">View all</Link>} padded={false}>
           {incidents.loading ? (
             <LoadingState label="Loading incidents..." />
@@ -158,26 +155,6 @@ export default function AdminDashboard() {
           )}
         </Card>
 
-        <Card title="Current assignments" subtitle="Busy responders and their incidents">
-          {busyResponders.length === 0 ? (
-            <p className="text-sm text-mute">{responders.data ? 'No responder is busy.' : 'Responder data is unavailable.'}</p>
-          ) : (
-            <ul className="space-y-3 text-sm">
-              {busyResponders.map((r) => {
-                const inc = r.currentIncidentId !== null ? incidentById.get(r.currentIncidentId) : undefined
-                return (
-                  <li key={r.id} className="rounded-lg border border-line bg-night px-3 py-2.5">
-                    <p className="font-medium text-ink">{r.name}</p>
-                    <p className="text-xs text-mute">
-                      <Link to={`/app/incidents?open=${r.currentIncidentId}`} className="font-medium text-brand hover:underline">Incident #{r.currentIncidentId}</Link>
-                      {inc ? ` · ${inc.description.slice(0, 48)}${inc.description.length > 48 ? '...' : ''}` : ''}
-                    </p>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </Card>
       </div>
 
       {selectedId !== null && <IncidentDetailLoader key={selectedId} id={selectedId} fallback={list.find((i) => i.id === selectedId)} onClose={() => setSelectedId(null)} refreshToken={refreshToken} footer={buttonsFor} />}

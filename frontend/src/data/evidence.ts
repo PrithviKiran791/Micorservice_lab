@@ -56,13 +56,13 @@ export const UNIT_TESTS: TestRow[] = [
   { suite: 'auth-service', tests: 5, result: 'PASS', covers: 'duplicate username 409, role always USER, only the BCrypt hash stored, same 401 for wrong password and unknown user', source: 'docs/evidence/unit-tests-auth-service.txt' },
   { suite: 'api-gateway', tests: 30, result: 'PASS', covers: 'JWT checks (missing, garbage, expired, wrong secret, wrong issuer, unknown role), forged headers replaced, GET retry on a dead copy, web UI route (7 tests), operations API: 401/403, real states, no secrets leaked (9 tests)', source: 'docs/evidence/unit-tests-api-gateway.txt' },
   { suite: 'responder-service (real PostgreSQL, Testcontainers)', tests: 4, result: 'PASS', covers: '10 simultaneous assignments for 3 ambulances give exactly 3 responders (row lock), assign is idempotent', source: 'docs/evidence/unit-tests-responder-service.txt' },
-  { suite: 'incident-service (real PostgreSQL, real circuit breaker)', tests: 19, result: 'PASS', covers: '409, refused, timeout and HTTP 500 all give PENDING quickly; 3 failures open the breaker and nothing reaches the responder while it is open; USER gets 403 on admin endpoints; events published and a broker failure never fails the request', source: 'docs/evidence/unit-tests-incident-service.txt' },
+  { suite: 'incident-service (real PostgreSQL, real circuit breaker)', tests: 21, result: 'PASS', covers: '409, refused, timeout and HTTP 500 all give PENDING quickly; 3 failures open the breaker and nothing reaches the responder while it is open; USER gets 403 on admin endpoints; events published and a broker failure never fails the request; coordinates stored and returned, reporting without them still works', source: 'docs/evidence/unit-tests-incident-service.txt' },
   { suite: 'notification-service (real PostgreSQL)', tests: 9, result: 'PASS', covers: 'templates, duplicate eventId creates one notification, malformed events rejected', source: 'docs/evidence/unit-tests-notification-service.txt' },
   { suite: 'discovery-service', tests: 0, result: '-', covers: 'no application logic of its own (Eureka); verified through the cluster tests', source: 'docs/evidence/unit-tests-discovery-service.txt' },
 ]
 
 export const TESTS_ADDED_LATER = [
-  'Total JUnit tests when last run on 25 Nov 2026: 67 (the logs above are from that run). frontend: 57 unit tests (Vitest), not part of those logs.',
+  'Total JUnit tests when last run on 25 Nov 2026: 69 (the logs above are from that run). frontend: 75 unit tests (Vitest), not part of those logs.',
   'Details and exact commands: docs/TEST_REPORT.md (sections A1 and A5).',
 ]
 

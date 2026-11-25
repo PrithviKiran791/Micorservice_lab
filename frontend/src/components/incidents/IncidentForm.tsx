@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import { Send } from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 import { INCIDENT_TYPES, SEVERITIES, type Incident, type IncidentType, type Severity } from '../../types/api'
 import { incidentService } from '../../services/incidentService'
 import { toAppError } from '../../services/errors'
 import { INCIDENT_TYPE_LABEL, SEVERITY_LABEL } from '../../utils/format'
 import { toCreateRequest, validateIncident, type IncidentFormErrors, type IncidentFormValues } from '../../utils/validation'
 import { INCIDENT_TYPE_ICON } from '../common/Badge'
-import { Button } from '../common/Button'
 import { TextArea, TextInput } from '../common/FormField'
+import { HoverBorderGradient } from '../ui/hover-border-gradient'
+import { LocationPicker } from '../map/LocationPicker'
 
 const SEVERITY_STYLE: Record<Severity, string> = {
   LOW: 'peer-checked:border-sky peer-checked:bg-sky/15 peer-checked:text-sky',
@@ -23,7 +24,7 @@ const SEVERITY_HINT: Record<Severity, string> = {
 
 /** The structured emergency report. Validates before sending; the backend validates again and its errors are shown too. */
 export function IncidentForm({ onCreated }: { onCreated: (incident: Incident) => void }) {
-  const [values, setValues] = useState<IncidentFormValues>({ type: '', severity: '', description: '', locationText: '' })
+  const [values, setValues] = useState<IncidentFormValues>({ type: '', severity: '', description: '', locationText: '', position: null })
   const [errors, setErrors] = useState<IncidentFormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -46,7 +47,10 @@ export function IncidentForm({ onCreated }: { onCreated: (incident: Incident) =>
       const appError = toAppError(err)
       if (appError.code === 'VALIDATION_ERROR' && appError.details.length > 0) {
         const fieldErrors: IncidentFormErrors = {}
-        for (const d of appError.details) if (d.field in values) fieldErrors[d.field as keyof IncidentFormValues] = d.message
+        for (const d of appError.details) {
+          if (d.field === 'latitude' || d.field === 'longitude') fieldErrors.position = d.message
+          else if (d.field in values) fieldErrors[d.field as keyof IncidentFormValues] = d.message
+        }
         setErrors(fieldErrors)
       }
       setServerError(appError.message)
@@ -113,15 +117,34 @@ export function IncidentForm({ onCreated }: { onCreated: (incident: Incident) =>
         hint="Describe where help is needed (building, floor, landmark)."
       />
 
+      <fieldset>
+        <legend className="mb-1 text-sm font-medium text-ink">Position on the map <span className="font-normal text-mute">(optional)</span></legend>
+        <p className="mb-3 text-xs text-mute">Pinning the exact spot helps the dispatcher see where help is needed. You can skip this and send the report with the description only.</p>
+        <LocationPicker
+          value={values.position ?? null}
+          onChange={(position) => set('position', position)}
+          onPlaceName={(name) => setValues((v) => (v.locationText.trim() === '' ? { ...v, locationText: name.slice(0, 200) } : v))}
+        />
+        {errors.position && <p className="mt-1.5 text-xs text-critical" role="alert">{errors.position}</p>}
+      </fieldset>
+
       {serverError && (
         <p className="rounded-md border border-critical/40 bg-critical/10 px-3 py-2 text-sm text-critical" role="alert">
           {serverError}
         </p>
       )}
 
-      <Button type="submit" size="md" className="w-full sm:w-auto" loading={submitting} icon={Send}>
-        {submitting ? 'Sending report...' : 'Report emergency'}
-      </Button>
+      <HoverBorderGradient
+        as="button"
+        type="submit"
+        disabled={submitting}
+        highlightColor="#ef4444"
+        containerClassName="w-full rounded-full sm:w-auto"
+        className="h-10 w-full px-5 text-sm font-semibold sm:w-auto"
+      >
+        {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+        <span>{submitting ? 'Sending report...' : 'Report emergency'}</span>
+      </HoverBorderGradient>
     </form>
   )
 }

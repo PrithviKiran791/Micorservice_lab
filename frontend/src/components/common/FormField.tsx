@@ -1,7 +1,7 @@
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 const CONTROL =
-  'w-full rounded-md border bg-night px-3 text-sm text-ink placeholder:text-faint transition-colors focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
+  'w-full rounded-xl border bg-night/65 backdrop-blur-md px-3.5 text-sm text-ink placeholder:text-mute/70 transition-colors focus:border-brand focus:bg-night/80 disabled:cursor-not-allowed disabled:opacity-60'
 
 interface FieldShellProps {
   id: string
@@ -24,7 +24,7 @@ function FieldShell({ id, label, error, hint, children }: FieldShellProps) {
           {error}
         </p>
       ) : (
-        hint && <p className="mt-1.5 text-xs text-faint">{hint}</p>
+        hint && <p className="mt-1.5 text-xs text-mute">{hint}</p>
       )}
     </div>
   )
@@ -40,7 +40,7 @@ interface CommonProps {
 export function TextInput({ id, label, error, hint, className = '', ...rest }: CommonProps & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <FieldShell id={id} label={label} error={error} hint={hint}>
-      <input id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} h-10 ${error ? 'border-critical' : 'border-line'} ${className}`} {...rest} />
+      <input id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} h-10 ${error ? 'border-critical' : 'border-white/15'} ${className}`} {...rest} />
     </FieldShell>
   )
 }
@@ -48,7 +48,7 @@ export function TextInput({ id, label, error, hint, className = '', ...rest }: C
 export function SelectInput({ id, label, error, hint, className = '', children, ...rest }: CommonProps & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <FieldShell id={id} label={label} error={error} hint={hint}>
-      <select id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} h-10 ${error ? 'border-critical' : 'border-line'} ${className}`} {...rest}>
+      <select id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} h-10 ${error ? 'border-critical' : 'border-white/15'} ${className}`} {...rest}>
         {children}
       </select>
     </FieldShell>
@@ -58,7 +58,7 @@ export function SelectInput({ id, label, error, hint, className = '', children, 
 export function TextArea({ id, label, error, hint, className = '', ...rest }: CommonProps & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <FieldShell id={id} label={label} error={error} hint={hint}>
-      <textarea id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} min-h-28 py-2 ${error ? 'border-critical' : 'border-line'} ${className}`} {...rest} />
+      <textarea id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className={`${CONTROL} min-h-28 py-2.5 ${error ? 'border-critical' : 'border-white/15'} ${className}`} {...rest} />
     </FieldShell>
   )
 }

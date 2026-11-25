@@ -1,5 +1,6 @@
 import type { CreateIncidentRequest, IncidentType, Severity } from '../types/api'
 import { INCIDENT_TYPES, SEVERITIES } from '../types/api'
+import { roundCoordinates, toCoordinates, type Coordinates } from './geo'
 
 /**
  * Client-side checks that mirror the backend rules (docs/API_CONTRACT.md). They only give fast feedback: the backend
@@ -29,6 +30,8 @@ export interface IncidentFormValues {
   severity: Severity | ''
   description: string
   locationText: string
+  /** Optional position chosen on the map. Without it the report is sent with the text description only. */
+  position?: Coordinates | null
 }
 
 export type IncidentFormErrors = Partial<Record<keyof IncidentFormValues, string>>
@@ -46,12 +49,18 @@ export function validateIncident(values: IncidentFormValues): IncidentFormErrors
   return errors
 }
 
-/** Builds the request body once the form is valid. (Latitude and longitude are optional in the API and are not collected.) */
+/**
+ * Builds the request body once the form is valid. Latitude and longitude are optional in the API: they are sent only
+ * when a valid position was chosen on the map, always as a pair, rounded to the 6 decimals the database stores.
+ */
 export function toCreateRequest(values: IncidentFormValues): CreateIncidentRequest {
+  const position = values.position ? toCoordinates(values.position.lat, values.position.lng) : null
+  const coordinates = position ? roundCoordinates(position) : null
   return {
     type: values.type as IncidentType,
     severity: values.severity as Severity,
     description: values.description.trim(),
     locationText: values.locationText.trim(),
+    ...(coordinates ? { latitude: coordinates.lat, longitude: coordinates.lng } : {}),
   }
 }

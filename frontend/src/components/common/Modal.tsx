@@ -44,9 +44,9 @@ export function Modal({ title, onClose, children, footer, widthClass = 'max-w-xl
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={`rq-fade-in flex max-h-[92vh] w-full flex-col rounded-t-xl border border-line bg-panel shadow-2xl shadow-black/60 outline-none sm:rounded-xl ${widthClass}`}>
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={`rq-fade-in flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-white/15 bg-panel/85 backdrop-blur-xl shadow-2xl shadow-black/60 outline-none sm:rounded-2xl ${widthClass}`}>
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="rounded p-1 text-mute hover:text-ink" aria-label="Close">
             <X className="h-5 w-5" />

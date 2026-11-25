@@ -1,6 +1,6 @@
-# mvn -B clean test in incident-service (JDK 17), 25 Nov 2026 18:52
+# mvn -B clean test in incident-service (JDK 17), 25 Nov 2026 20:12
 [INFO] Building incident-service 1.0
 [INFO] Running com.resqnet.incident.service.IncidentFlowTest
-[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 25.81 s -- in com.resqnet.incident.service.IncidentFlowTest
-[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 31.56 s -- in com.resqnet.incident.service.IncidentFlowTest
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS

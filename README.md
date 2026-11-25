@@ -5,7 +5,7 @@ A user reports an emergency (medical, fire, police). The system saves it, asks a
 responder of the right type, assigns one, and records a notification. If the responder service is down, the
 incident is **still accepted** as `PENDING` and can be dispatched later.
 
-A **React web interface** (served through the same gateway) gives reporters a simple portal and gives the dispatcher an **operations command center** that shows the real health of every service, Eureka, the databases, RabbitMQ, the circuit breaker and the Kubernetes deployment, plus a **Lab evaluation** page for the eight lab criteria (section 7c).
+A **React web interface** (served through the same gateway) gives reporters a simple portal and gives the dispatcher an **operations command center** that shows the real health of every service, Eureka, the databases, RabbitMQ, the circuit breaker and the Kubernetes deployment, plus a **Lab evaluation** page for the eight lab criteria (section 7c). Reporters can pin the emergency position on an **OpenStreetMap** map, and the dispatcher sees every incident that has a position on an interactive, automatically refreshed **incident map** (section 7d).
 
 Everything runs as pods on **Minikube** (Kubernetes) behind a single **API Gateway** that checks a **JWT** on every request.
 This is a simulation: no real emergency services or personal data are involved. Total cost: Rs 0 (all free, open-source tools).
@@ -25,7 +25,7 @@ The lab slide lists eight criteria. Honest status of each:
 | **Resilience** | Scale `responder-service` to 0: incidents are still accepted (`PENDING`), login and notifications still work | Done and verified in the cluster |
 | **Service discovery and gateway** | **Eureka** registry + one **Spring Cloud Gateway** entry point routing by service name (`lb://...`) | Done and verified in the cluster |
 | **Security** | JWT checked **at the gateway**; 401 without a valid token, 403 for a USER on admin endpoints | Done and verified (19 checks) |
-| **Testing** | JUnit tests in every service | **Done.** 67 automated JUnit tests pass (`scripts/run-unit-tests.ps1`), plus scripts and Postman; every result is in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) (application tests and script/document tests kept separate). |
+| **Testing** | JUnit tests in every service | **Done.** 69 automated JUnit tests pass (`scripts/run-unit-tests.ps1`), plus scripts and Postman; every result is in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) (application tests and script/document tests kept separate). |
 
 ---
 
@@ -98,6 +98,8 @@ Other patterns used: gateway retry of idempotent GETs, idempotent consumer (uniq
 
 Java 17 · Spring Boot 3.5 · Spring Cloud 2025.0 (Gateway, Netflix Eureka, LoadBalancer) · Spring Data JPA · PostgreSQL 16 ·
 RabbitMQ 3 (Spring AMQP) · Resilience4j · jjwt 0.12 · Maven · Docker · Kubernetes (Minikube) · JUnit 5, Mockito, Testcontainers · PowerShell scripts.
+
+Web UI: React 19 · TypeScript · Vite · Tailwind CSS · React Router · Axios · Recharts · Leaflet / React Leaflet with OpenStreetMap tiles · Vitest · nginx (production image).
 
 ---
 
@@ -219,7 +221,7 @@ Full details, payloads and error codes: [`docs/API_CONTRACT.md`](docs/API_CONTRA
 
 ## 7b. Web UI
 
-Open the gateway address in a browser (`kubectl -n resqnet port-forward svc/api-gateway 8080:8080`, then `http://localhost:8080`, or the public tunnel address). The React app in `frontend/` is served by the gateway itself (a lowest-priority route to an nginx pod) and calls the API on the same address under `/api`, so it never talks to a single microservice. Sign in as the seeded dispatcher `admin` / `Admin@123` (demo value) or register a reporter. Details, role matrix, honest gap list and tests: [`docs/FRONTEND.md`](docs/FRONTEND.md).
+The interface has a dark navy command-center look. The public landing, login and register pages use an animated sky / light-rays backdrop with a translucent navbar, and the signed-in app has a collapsible icon sidebar (all in `frontend/src/components/ui` and `layout`; the design is purely visual and changes no API behaviour). Open the gateway address in a browser (`kubectl -n resqnet port-forward svc/api-gateway 8080:8080`, then `http://localhost:8080`, or the public tunnel address). The React app in `frontend/` is served by the gateway itself (a lowest-priority route to an nginx pod) and calls the API on the same address under `/api`, so it never talks to a single microservice. Sign in as the seeded dispatcher `admin` / `Admin@123` (demo value) or register a reporter. Details, role matrix, honest gap list and tests: [`docs/FRONTEND.md`](docs/FRONTEND.md).
 
 ---
 
@@ -238,6 +240,14 @@ Signed in as the dispatcher (`admin`), the sidebar becomes a command center. It 
 Every number is tagged **Live**, **Calculated**, **Recorded evidence**, **Design** or **Unavailable**, so measured values are never confused with recorded results. There is deliberately no browser button that stops a service or starts a load test: the demo workflows show the `kubectl` / PowerShell commands instead. Details: [`docs/FRONTEND.md`](docs/FRONTEND.md), [`docs/LAB_EVALUATION.md`](docs/LAB_EVALUATION.md), [`docs/INTEGRATION_AUDIT.md`](docs/INTEGRATION_AUDIT.md).
 
 **A finding worth knowing for the viva:** when the responder pod is stopped gracefully, Eureka removes it at once, so the call fails immediately (no instance), the fallback stores the incident as `PENDING`, but the circuit breaker **stays CLOSED**, because that exception is not in the breaker's `record-exceptions` and Resilience4j counts it as a success. The breaker opens when the service is registered but not answering (crash, timeout, HTTP 5xx). The dashboard shows this honestly.
+
+---
+
+## 7d. Interactive incident map
+
+The administrator **Operations overview** is built around a Leaflet / React Leaflet map on OpenStreetMap tiles: one marker per incident at its **stored coordinates** (colour = severity, symbol = type, badge = status, grey once resolved), a popup with the incident details and a **View details** link, filters (type, severity, status, reported within) with a reset button, a critical-incident queue, recent incidents, and a list of incidents that have **no** position so none is lost. The map refreshes by polling the existing API (no WebSocket) and keeps its view while it does.
+
+Reporters can pin the position on the **Report emergency** page: click the map, drag the pin, search a place (Nominatim, only when Search is pressed) or use the device location (only when its button is pressed). The position is **optional**: latitude and longitude are sent together, or not at all, exactly as the existing API defines them (no backend change was needed). Responders are **not** on the map, because the responder service stores no positions; this is not live GPS tracking. Details, component structure, OpenStreetMap usage, limitations and future responder tracking: [`docs/MAP.md`](docs/MAP.md).
 
 ---
 
@@ -265,8 +275,8 @@ cd <service>; mvn test        # use JDK 17; Docker must be running (Testcontaine
 | auth-service | 5 | duplicate username 409, wrong password 401, registration always USER |
 | api-gateway | 30 | JWT rules (missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, forged headers replaced); GET retried on a healthy copy, POST never retried; web UI route; **operations API**: 401 / 403, DEGRADED / DOWN / UNKNOWN reported from fake Eureka, services and Kubernetes, no secrets leaked |
 | responder-service | 4 | 10 concurrent assignments for 3 ambulances give exactly 3 distinct responders (verified to fail if the row lock is removed); idempotent assign; release rules |
-| incident-service | 19 | fallback to `PENDING` on 409 / connection refused / 3 s hang / HTTP 500, breaker opens, dispatch/resolve rules, access rules, events published |
-| frontend (Vitest) | 57 | statistics, JWT expiry, validation, error mapping, token storage, route guards, role navigation, lab-evaluation status rules (`cd frontend; npm test`) |
+| incident-service | 21 | fallback to `PENDING` on 409 / connection refused / 3 s hang / HTTP 500, breaker opens, dispatch/resolve rules, access rules, events published |
+| frontend (Vitest) | 75 | statistics, JWT expiry, validation, error mapping, token storage, route guards, role navigation, lab-evaluation status rules (`cd frontend; npm test`) |
 | notification-service | 9 | duplicate `eventId` creates one notification (also with 8 simultaneous copies), malformed events rejected, templates, access rules |
 
 Beyond unit tests, these were run against the real cluster: a 10-case security checklist (plus 9 extra checks), the resilience scenarios, pod-restart self-healing and persistence, RabbitMQ and notification outages, and the Eureka/load-balancing scenarios.
@@ -286,6 +296,7 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | endpoints, payloads, status codes, events (highest authority) |
 | [`docs/schema.md`](docs/schema.md) | tables, enums, state machines |
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
+| [`docs/MAP.md`](docs/MAP.md) | incident map: coordinates in the API, component structure, filters, location picker, OpenStreetMap use, limitations, future responder tracking |
 | [`docs/INTEGRATION_AUDIT.md`](docs/INTEGRATION_AUDIT.md) | frontend-to-backend audit: dependency diagram, integration matrix, observability gaps and how they were closed |
 | [`docs/LAB_EVALUATION.md`](docs/LAB_EVALUATION.md) | the eight lab criteria with implementation, live checks, evidence, demo steps, and what was observed in the resilience run |
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | web UI and command center: pages and roles, where every number comes from, the operations API, gaps, local run, Docker/Kubernetes, tests |
@@ -317,11 +328,11 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
 | `scripts/start-public-url.ps1` | temporary public HTTPS link (Cloudflare quick tunnel) to the gateway on the laptop; `-Check` runs the smoke test through it |
-| `scripts/run-unit-tests.ps1` | all 67 JUnit tests with a summary table |
+| `scripts/run-unit-tests.ps1` | all 69 JUnit tests with a summary table |
 | `scripts/verify-docs.ps1` | checks that every file, link, script option, class.method and Kubernetes name mentioned in the documents exists |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 
-The web UI and command center (sections 7b and 7c) were verified against the live cluster: unit tests (frontend 57, JUnit 67), the final smoke test (37/37), the resilience demo (16/16), the failover demo (7/7) and the Security page (10/10 live checks). The demo scripts need free responders of the type they report (fire trucks, ambulances): leftover open incidents can make step 1 report PENDING.
+The web UI and command center (sections 7b and 7c) were verified against the live cluster: unit tests (frontend 75, JUnit 69), the final smoke test (37/37), the resilience demo (16/16), the failover demo (7/7) and the Security page (10/10 live checks). The demo scripts need free responders of the type they report (fire trucks, ambulances): leftover open incidents can make step 1 report PENDING.
 
 Still to do (tracked in `docs/tracker.md`):
 - the optional admin endpoints for responders (create, set OFFLINE) were not built

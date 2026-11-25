@@ -31,11 +31,11 @@ browser --> api-gateway (:8080) --+--> /api/ops/**    --> answered by the gatewa
 | `/` | Landing | yes | yes | none |
 | `/login`, `/register` | Sign in / create reporter account | guests | guests | `POST /api/auth/login`, `/register` |
 | `/app/overview` | Reporter overview | yes | (goes to operations overview) | `GET /api/incidents`, `/api/responders` |
-| `/app/report` | Report emergency | yes | yes | `POST /api/incidents` |
+| `/app/report` | Report emergency, with an optional **map position picker** | yes | yes | `POST /api/incidents` (with `latitude` / `longitude` when a position was chosen) |
 | `/app/incidents` | My incidents (USER) / Incidents (ADMIN); the detail dialog loads `GET /api/incidents/{id}`; deep link `?open=<id>` | own incidents | all, dispatch / resolve | `GET /api/incidents[?status]`, `GET /api/incidents/{id}`, `POST .../dispatch`, `.../resolve` |
 | `/app/notifications` | Notifications | own | own | `GET /api/notifications`, `PATCH .../{id}/read` |
 | `/app/settings` | Profile (USER) / Settings (ADMIN) | yes | yes | `GET /api/auth/me` |
-| `/app/admin` | **Operations overview**: platform health strip, incident counters, responder counters, pending queue, dispatch | redirected | yes | incidents, responders, `GET /api/ops/health`, dispatch |
+| `/app/admin` | **Operations overview**: key counters, the **incident map** with filters and side panel (critical queue, recent incidents, incidents without a position), pending queue, dispatch, responder panel, platform health (see `docs/MAP.md`) | redirected | yes | incidents, responders, `GET /api/ops/health`, dispatch |
 | `/app/responders` | Responder directory; the detail dialog loads `GET /api/responders/{id}` | direct URL only | yes | `GET /api/responders[?status&type]`, `GET /api/responders/{id}` |
 | `/app/analytics` | Charts computed from the API answers | direct URL only | yes | the same GETs |
 | `/app/health` | **Service health**: services, Eureka, load balancing, databases, RabbitMQ, resilience, Kubernetes | redirected | yes | `GET /api/ops/*` |
@@ -97,7 +97,7 @@ Nothing below was invented or faked in the UI.
 | Message rates, queue depth | not exposed (RabbitMQ management stays private) | shown as not measured |
 | Database performance | not measured | only connectivity is shown |
 | Per-route request counts at the gateway | the gateway does not publish them | distribution is measured at the incident-service pods; the limitation is stated on the page |
-| Map / GPS | latitude/longitude are optional and not collected | location is free text |
+| Responder positions / live GPS | the responder service stores no coordinates and nothing reports them | responders are listed with availability and assignment only; incidents are mapped from the positions their reporters chose (`docs/MAP.md`) |
 | "Mark all notifications read" | only `PATCH /{id}/read` exists | one PATCH per unread item |
 | Server-side logout / refresh token | JWT is stateless, no endpoint | logout deletes the token in the browser |
 | Security event counters | the gateway only logs rejections | no "attacks blocked" figure is shown |
@@ -111,7 +111,7 @@ cd frontend
 npm ci
 npm run dev          # http://localhost:5173, proxies /api to http://localhost:8080
 npm run typecheck
-npm test             # 57 unit tests (Vitest)
+npm test             # 75 unit tests (Vitest)
 npm run build        # production build in frontend/dist
 ```
 
@@ -133,7 +133,7 @@ kubectl -n resqnet port-forward svc/api-gateway 8080:8080 # then open http://loc
 
 | Where | What | Result (25 Nov 2026) |
 |---|---|---|
-| `frontend/src/**/*.test.ts(x)` | statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards, role navigation, lab-evaluation status rules | 57 passed |
+| `frontend/src/**/*.test.ts(x)` | statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards, role navigation, lab-evaluation status rules | 75 passed |
 | `GatewayFrontendRouteTest` | UI served without a token; SPA paths forwarded unchanged; `/api` still 401; unknown `/api` 404; `/internal` 404; only GET/HEAD | 7 passed |
 | `OpsApiTest` | 401 without or with a bad/expired token, 403 for USER, real states from fake Eureka/services/Kubernetes (DEGRADED, DOWN, UNKNOWN), circuit-breaker and traffic parsing, no secrets leaked, no cluster means "unavailable" | 9 passed |
 | `scripts/smoke-test.ps1` after deployment | all backend rules, unchanged | 37 passed |

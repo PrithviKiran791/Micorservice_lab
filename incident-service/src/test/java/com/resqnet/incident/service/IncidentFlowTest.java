@@ -130,6 +130,32 @@ class IncidentFlowTest {
         assertEquals(CircuitBreaker.State.CLOSED, breaker().getState());
     }
 
+    // ---- coordinates (used by the incident map in the web UI) ------------------------------
+
+    @Test
+    void coordinatesAreStoredAndReturnedWhenReportingAndWhenReadingBack() {
+        IncidentResponse created = service.create(asha, new CreateIncidentRequest(IncidentType.FIRE, Severity.MEDIUM,
+                "Smoke from a shop", "100 Feet Road, Indiranagar", new java.math.BigDecimal("12.978400"), new java.math.BigDecimal("77.640800")));
+
+        assertEquals(0, new java.math.BigDecimal("12.978400").compareTo(created.latitude()));
+        assertEquals(0, new java.math.BigDecimal("77.640800").compareTo(created.longitude()));
+
+        IncidentResponse readBack = service.get(asha, created.id());          // what GET /incidents/{id} returns
+        assertEquals(0, new java.math.BigDecimal("12.978400").compareTo(readBack.latitude()));
+        assertEquals(0, new java.math.BigDecimal("77.640800").compareTo(readBack.longitude()));
+        assertTrue(service.list(asha, null).stream().anyMatch(i -> i.id().equals(created.id()) && i.latitude() != null),
+                "the list endpoint must carry the coordinates too");
+    }
+
+    @Test
+    void reportingWithoutCoordinatesStillWorksAndReturnsNulls() {
+        IncidentResponse r = report(asha);                                      // report() sends no coordinates
+
+        assertNull(r.latitude());
+        assertNull(r.longitude());
+        assertNull(service.get(asha, r.id()).latitude());
+    }
+
     @Test
     void noResponderAvailable409_incidentIsPending_andBreakerIsNotAffected() {
         mode.set(Mode.CONFLICT);

@@ -16,10 +16,10 @@ Raw logs are in [`docs/evidence/`](evidence/). "PASS" below means I ran the comm
 | auth-service | 5 | PASS | duplicate username -> 409 `USERNAME_TAKEN`; registration always role `USER` and stores only the BCrypt hash; wrong password and unknown user give the same 401 `INVALID_CREDENTIALS`; login returns a Bearer token |
 | api-gateway | 30 | PASS | operations API (9): 401 without or with a bad/expired token, 403 for USER, DEGRADED / DOWN / UNKNOWN reported from fake Eureka and services, no secrets leaked, Kubernetes unavailable outside a cluster; web UI route (7): UI served without a token, SPA paths forwarded unchanged, `/api` still 401, unknown `/api` and `/internal` 404 and never sent to the UI, UI route is GET/HEAD only; missing, garbage, non-Bearer, expired, wrong-secret, wrong-issuer and unknown-role tokens are rejected with 401 and never forwarded; valid token forwarded with trusted `X-User-*`; forged headers replaced (also on public routes); login/register public, `/auth/me` not; short secret fails at start-up; **retry:** GET succeeds although one of two copies is dead, POST is never retried |
 | responder-service (real PostgreSQL via Testcontainers) | 4 | PASS | 10 simultaneous assignments for 3 ambulances give exactly 3 distinct responders and 7 refusals; assign is idempotent per incident; release is idempotent; release for another incident is refused |
-| incident-service (real PostgreSQL + real circuit breaker + fake responder server) | 19 | PASS | assigned; 409 -> `PENDING` without touching the breaker; connection refused, 3 s hang (read timeout) and HTTP 500 -> `PENDING` quickly; 3 failures open the breaker and no request reaches the responder while it is open; dispatch / resolve rules and 409s; resolve while responder is down -> 503 and state unchanged; USER 403 on admin endpoints; ownership and listing rules; 404; events: `incident.assigned`, `incident.pending`, unique `eventId`, broker failure never fails the request, failed dispatch publishes nothing |
+| incident-service (real PostgreSQL + real circuit breaker + fake responder server) | 21 | PASS | assigned; 409 -> `PENDING` without touching the breaker; connection refused, 3 s hang (read timeout) and HTTP 500 -> `PENDING` quickly; 3 failures open the breaker and no request reaches the responder while it is open; dispatch / resolve rules and 409s; resolve while responder is down -> 503 and state unchanged; USER 403 on admin endpoints; ownership and listing rules; 404; events: `incident.assigned`, `incident.pending`, unique `eventId`, broker failure never fails the request, failed dispatch publishes nothing |
 | notification-service (real PostgreSQL) | 9 | PASS | template texts; duplicate `eventId` creates one notification, also with 8 simultaneous copies; malformed events rejected without requeue; incident-service JSON (with its foreign `__TypeId__` header) is understood; own/all/`mine` listing; mark-read rules (403, 404) |
 | discovery-service | 0 | - | no application logic of its own (Eureka); verified through the cluster tests below |
-| **Total** | **67** | **PASS** | command: `.\scripts\run-unit-tests.ps1`, exit code 0 (logs: `docs/evidence/unit-tests-*.txt`) |
+| **Total** | **69** | **PASS** | command: `.\scripts\run-unit-tests.ps1`, exit code 0 (logs: `docs/evidence/unit-tests-*.txt`) |
 
 Test quality check: the responder concurrency test was run with the row lock removed from the SQL and **failed** ("responder handed out twice"); the gateway retry test was run with GET retry switched off and **failed** (503 instead of 200). Both locks were restored afterwards.
 
@@ -73,9 +73,9 @@ Test quality check: the responder concurrency test was run with the row lock rem
 
 | What | How | Result |
 |---|---|---|
-| Unit tests: statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards, role navigation, lab-evaluation status rules | `cd frontend; npm test` (Vitest) | 57 passed |
+| Unit tests: statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards, role navigation, lab-evaluation status rules | `cd frontend; npm test` (Vitest) | 75 passed |
 | Type check and production build | `npm run typecheck; npm run build` (strict TypeScript) | pass |
-| Gateway tests incl. UI route and operations API | `.\scripts\run-unit-tests.ps1` | gateway 30 passed; all services 67 passed, 0 failed |
+| Gateway tests incl. UI route and operations API | `.\scripts\run-unit-tests.ps1` | gateway 30 passed; all services 69 passed, 0 failed |
 | Docker image and Kubernetes (no namespace deletion) | `docker build`, `minikube image load`, `kubectl apply`, rollout restarts | 11 pods Ready; `/`, `/app/incidents` (refresh) and assets 200; `/api/incidents` without token 401; `/api/nothing` 404; `/internal/...` 404 |
 | Backend unchanged | `.\scripts\smoke-test.ps1` after the first UI deployment | 37 passed, 0 failed |
 | Operations API on the live cluster | `GET /api/ops/health | resilience | traffic | kubernetes` as ADMIN; no token 401 | all six services, Eureka, four databases, RabbitMQ, breaker per pod, request counters per pod and 9 deployments / 11 pods reported from live sources |
@@ -89,6 +89,24 @@ Test quality check: the responder concurrency test was run with the row lock rem
 **Finding from the resilience run (not a defect of the dashboard):** with the responder pod stopped gracefully, Eureka removes it immediately, so the call fails at once with `IllegalArgumentException: Service Instance cannot be null`. That exception is not in the breaker's `record-exceptions`, so Resilience4j counts it as a success: the fallback ran (incidents became PENDING, log line `FALLBACK used`) but the circuit breaker stayed CLOSED. The breaker opens when the service is registered but not answering, which `IncidentFlowTest` covers. The dashboard shows the true state and explains this. Adding the exception to `record-exceptions` would make the breaker open here too; it was not changed because it alters existing resilience behaviour.
 
 **Observed once:** a rolling update of the UI pod returned one HTTP 503 from the gateway (pooled connection to the old pod). The UI route now retries GET like the API routes.
+
+## A6. Interactive incident map (added 25 Nov 2026)
+
+| What | How | Result |
+|---|---|---|
+| Coordinate, filter, marker-colour and request-body logic | `frontend/src/utils/map.test.ts` | 15 passed |
+| Coordinates stored and returned; report without coordinates | 2 tests added to `IncidentFlowTest` (real PostgreSQL) | incident-service 21 passed |
+| Full frontend suite, strict type check, production build | `npm test; npm run typecheck; npm run build` | 75 passed; pass; Leaflet is a separate 51 kB (gzip) chunk |
+| API round trip through the gateway | incident created with `latitude` / `longitude`, read back; latitude 123 | stored and returned unchanged; `400 VALIDATION_ERROR` with a field message |
+| Map in the browser (local dev server, live cluster, no deployment) | admin Operations overview | OpenStreetMap tiles load; attribution "© OpenStreetMap contributors" visible; 5 incidents drawn at their coordinates; colours red / amber / blue and grey after resolve; popup shows id, type, severity, status, location, responder, time, coordinates; **View details** opens `/app/incidents?open=<id>`; 21 incidents without a position listed, none lost |
+| Filters | type, severity, status, reported-within, Reset | Critical 11 shown / 2 markers; Critical + Fire 1; Resolved 0 markers; last hour 6 shown; Reset restores 26 / 5 markers and default values |
+| Automatic update | new incident created while the page was open | marker appeared after about 1 s; the 5 existing markers did not move |
+| Location picker (reporter) | click, drag, search "Cubbon Park Bengaluru", submit | pin placed, dragged coordinates changed, search results from Nominatim, location text suggested, backend stored `12.974254, 77.592191`; confirmation shows the saved position |
+| Report without a pin | submit with no position | incident created; confirmation says no map position was sent |
+| Error handling | gateway port-forward stopped while the map was open | markers kept, "could not be refreshed" banner with Try again; banner cleared by itself after recovery |
+| Layouts and console | 1440 px, 800 px and 375 px; console | side panel beside the map at 1440 px; at 375 px map and picker fit with no page overflow (fixed one grid-track bug found here); no console errors |
+
+**Not exercised:** the "Use my location" button (the browser's permission prompt and a real device position cannot be produced here; only that the button exists and the code path handles refusal and errors), real tile-server failure (the map would show empty tiles but keep working), and Firefox, Safari or a physical phone.
 
 ## B1. Scripts
 

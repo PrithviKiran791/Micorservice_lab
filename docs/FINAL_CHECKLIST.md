@@ -6,7 +6,7 @@ Status on 25 Nov 2026. "Evidence" points to a file in this repository or a comma
 
 | # | Deliverable | Status | Evidence |
 |---|---|---|---|
-| 1 | Services that build, run and pass their tests | DONE | six services (five plus the Eureka registry); `.\scripts\run-unit-tests.ps1` -> 67 tests pass; `.\scripts\rehearsal.ps1 -Rebuild` builds all six jars and images |
+| 1 | Services that build, run and pass their tests | DONE | six services (five plus the Eureka registry); `.\scripts\run-unit-tests.ps1` -> 69 tests pass; `.\scripts\rehearsal.ps1 -Rebuild` builds all six jars and images |
 | 2 | 4 databases, 4 users, no cross-database access | DONE | `db/init-databases.sh`; `psql \l`; `incident_user` is refused on `auth_db` (`docs/TEST_REPORT.md` A2) |
 | 3 | One synchronous REST call and one asynchronous RabbitMQ event, both demonstrated | DONE | `.\scripts\smoke-test.ps1` sections 3 and 4; `docs/diagrams/02-report-incident-sequence.png`, `04-event-flow.png` |
 | 4 | Circuit breaker fallback demonstrated by scaling responder-service to 0 | DONE | `.\scripts\demo-resilience.ps1` (16 checks) |
