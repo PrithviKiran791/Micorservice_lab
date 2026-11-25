@@ -1,3 +1,3 @@
-# scripts\verify-docs.ps1 (final run, 25 Nov 2026)
+# scripts\verify-docs.ps1 (final run, 25 Nov 2026, after Phase 7)
 
-verify-docs: 6 documents, 221 references correct, 0 wrong
+verify-docs: 8 documents, 327 references correct, 0 wrong

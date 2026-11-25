@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-ResQNet Lite is five Spring Boot applications plus PostgreSQL and RabbitMQ, all running as
+ResQNet Lite is six Spring Boot applications (five services plus the Eureka registry) plus PostgreSQL and RabbitMQ, all running as
 workloads in one Minikube namespace (`resqnet`). Clients talk only to the **API Gateway**.
 The gateway authenticates the JWT and routes requests to the owning service. Services
 communicate in two ways: a **synchronous REST call** (incident -> responder) and an
@@ -38,27 +38,30 @@ communicate in two ways: a **synchronous REST call** (incident -> responder) and
 
 Solid arrow incident -> responder is the synchronous call; the RabbitMQ path is the asynchronous event.
 
+Not drawn above: **discovery-service** (Eureka registry, :8761). Every service registers there and sends a heartbeat every 5 s; the gateway routes by service name (lb://incident-service) and incident-service calls `http://responder-service` as a registry name through a load-balanced client, so several copies of a service share the traffic (incident-service runs 2 copies). A picture is in `docs/diagrams/01-system-architecture.png`.
+
 ## 3. Services
 
 | Service | Port | Database | Responsibility |
 |---|---|---|---|
-| api-gateway | 8080 | none | Single entry point; validates JWT; routes `/api/**`; sets identity headers; never routes `/internal/**` |
+| api-gateway | 8080 | none | Single entry point; validates JWT; routes `/api/**` by service name (`lb://`); retries failed GETs; sets identity headers; never routes `/internal/**` |
 | auth-service | 8081 | `auth_db` | Register, login, issue JWT, seed admin |
-| incident-service | 8082 | `incident_db` | Incident lifecycle; sync call to responder-service; circuit breaker; publishes events |
+| incident-service (2 replicas) | 8082 | `incident_db` | Incident lifecycle; sync call to responder-service; circuit breaker; publishes events |
 | responder-service | 8083 | `responder_db` | Responder catalogue and availability; atomic assignment and release |
 | notification-service | 8084 | `notification_db` | Consumes events; stores and serves notifications |
+| discovery-service | 8761 | none | Eureka service registry; services register and look each other up by name |
 
 ## 4. Technology
 
 Java 17, Spring Boot 3.x, Spring Cloud Gateway (reactive), Spring Data JPA, PostgreSQL 16,
-Spring AMQP + RabbitMQ 3, Resilience4j, jjwt 0.12.x, Maven, Docker, Kubernetes (Minikube, docker driver).
+Spring AMQP + RabbitMQ 3, Resilience4j, Spring Cloud (Netflix Eureka, LoadBalancer; BOM 2025.0.3 with Spring Boot 3.5.16), jjwt 0.12.x, Maven, Docker, Kubernetes (Minikube, docker driver with the containerd runtime).
 
 ## 5. Communication design
 
 ### 5.1 Synchronous: incident-service -> responder-service
 
 - Why synchronous: the incident status (`ASSIGNED` vs `PENDING`) must be known in the response to the reporter.
-- `POST http://responder-service:8083/internal/responders/assign` using Spring `RestClient`
+- `POST http://responder-service/internal/responders/assign` (`responder-service` is a Eureka registry name resolved by a `@LoadBalanced` `RestClient`, not a DNS host)
   with connect timeout 1 s and read timeout 2 s.
 - Wrapped in a Resilience4j `CircuitBreaker` named `responderService`
   (sliding window 5, minimum 3 calls, 50 % failure threshold, 10 s open state, 2 half-open probes).
@@ -139,7 +142,8 @@ Login, list incidents and notifications continue to work because they do not dep
 | auth-service down | Existing tokens keep working (gateway validates locally); no new logins |
 | incident-service pod restarts | State is in Postgres; Kubernetes restarts the pod |
 | One copy of a service dies (e.g. one of two incident-service pods) | Gateway retries failed GET requests on another copy (up to 2 retries, 1 s connect timeout, 8 s response timeout); POST is never retried automatically. Measured: pod deleted under traffic, 114 of 114 GET requests returned 200, slowest 1.08 s (before the retry: 9 failures including a 30 s hang) |
-| Gateway down | Everything unreachable (single entry point; mitigated by 2 replicas if time permits) |
+| discovery-service down | Services keep using their cached copy of the registry for a while; new or dead instances are not noticed until it returns (by design, not tested) |
+| Gateway down | Everything unreachable (single entry point; a second replica is possible but not deployed) |
 
 Kubernetes provides self-healing (restarts failed containers) and readiness probes so traffic only
 reaches pods that are ready.
@@ -164,14 +168,15 @@ Namespace `resqnet`. One manifest file per concern in `k8s/`:
 | `02-config.yaml` | Shared ConfigMap, Postgres init script (creates 4 databases/users) |
 | `10-postgres.yaml` | Postgres Deployment + PVC + Service `postgres` |
 | `11-rabbitmq.yaml` | RabbitMQ Deployment + Service `rabbitmq` (5672, 15672) |
+| `15-discovery.yaml` | discovery-service (Eureka) Deployment + Service (8761) |
 | `20-auth.yaml` ... `23-notification.yaml` | Deployment + ClusterIP Service per service |
 | `30-gateway.yaml` | Deployment + Service (NodePort 30080) |
 
 Per workload: image `resqnet/<service>:1.0` (`imagePullPolicy: IfNotPresent`), environment from
 ConfigMap/Secret, liveness `/actuator/health/liveness`, readiness `/actuator/health/readiness`,
-resource requests ~256Mi / limits ~512Mi, `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70`.
+resource requests 256Mi / limits 768Mi, `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k` (small, quick-starting JVM), a `startupProbe` (up to 450 s on a slow laptop) and an init container that waits for Postgres (and RabbitMQ for notification-service). incident-service runs 2 replicas.
 
-Service discovery: Kubernetes DNS, e.g. `http://responder-service:8083`, `postgres:5432`, `rabbitmq:5672`.
+Service discovery: **Eureka** for the application services (`lb://<name>` in the gateway, `http://responder-service` in incident-service); Kubernetes DNS only for infrastructure (`postgres:5432`, `rabbitmq:5672`, `discovery-service:8761`). Pods register with their pod IP (`eureka.instance.prefer-ip-address`).
 Start-up order is not guaranteed; services must retry DB/broker connections (Spring Boot default behaviour plus readiness probe delays).
 
 Access from Windows: `kubectl -n resqnet port-forward svc/api-gateway 8080:8080` then use `http://localhost:8080`.
@@ -187,8 +192,8 @@ Access from Windows: `kubectl -n resqnet port-forward svc/api-gateway 8080:8080`
 | `JWT_SECRET` | auth, gateway | 32+ characters |
 | `JWT_EXPIRY_MINUTES` | auth | 120 |
 | `JWT_ISSUER` | auth, gateway | `resqnet-auth` |
-| `RESPONDER_SERVICE_URL` | incident | `http://localhost:8083` locally, `http://responder-service:8083` in cluster |
-| `AUTH_SERVICE_URL`, `INCIDENT_SERVICE_URL`, `RESPONDER_SERVICE_URL`, `NOTIFICATION_SERVICE_URL` | gateway | cluster DNS names |
+| `RESPONDER_SERVICE_URL` | incident | `http://responder-service` (a registry name; same locally and in the cluster) |
+| `EUREKA_URL` | all services | `http://localhost:8761/eureka` locally, `http://discovery-service:8761/eureka` in the cluster |
 
 ## 12. Observability
 
@@ -201,7 +206,10 @@ Actuator `health` and `info` endpoints only. Logs to stdout (`kubectl logs`). Lo
 |---|---|---|---|
 | D1 | One Postgres server, four databases/users | Saves RAM on Minikube | Shared server is a single point of failure |
 | D2 | JWT validated at gateway, header propagation | Meets "authentication checked at gateway", simple | Services trust headers; requires network isolation |
-| D3 | RestClient + Resilience4j (no Feign, no Eureka) | Fewer dependencies; Kubernetes DNS is service discovery | Manual client code |
+| D3 | RestClient + Resilience4j (no Feign) | Fewer dependencies | Manual client code |
+| D9 | Netflix Eureka added (discovery-service); gateway routes `lb://<name>`; `@LoadBalanced` client in incident-service (supersedes the original "no Eureka" decision) | The lab slide requires "Eureka and one gateway entry point" and load balancing | One more service to run; registry changes reach clients with a delay of a few seconds |
+o Eureka\\ decision) | The lab slide requires \\Eureka and one gateway entry point\\ and load balancing | One more service to run; registry changes reach clients with a delay of a few seconds |
+| D10 | Gateway retries idempotent GET only (2 retries), 1 s connect timeout | Smooth failover when a pod dies; a repeated POST could create a duplicate incident | A POST in the same second as a pod death can fail once |
 | D4 | RabbitMQ instead of Kafka | Light, simple, enough for one event | Less replay/streaming capability |
 | D5 | Internal endpoints under `/internal/**` not routed | Prevents external abuse of assign/release | Needs convention discipline |
 | D6 | Save first, call remote, then update | Avoids holding DB transactions across network calls | Needs `REPORTED` transitional state |

@@ -4,7 +4,7 @@
   Exit code 0 = everything named in the documents exists, 1 = at least one reference is wrong.
 
 .DESCRIPTION
-  For README.md, docs/viva/*.md, docs/demo/*.md and docs/TEST_REPORT.md it checks
+  For README.md, docs/viva/*.md, docs/demo/*.md, docs/TEST_REPORT.md and docs/FINAL_CHECKLIST.md it checks
     1. every file path in `backticks` and every Markdown link target exists (relative to the repo root or to the document),
     2. every script option such as -SkipBuild that appears next to a script name is declared in that script,
     3. every `Class.method` where Class.java exists in the repo really contains that method name,
@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 $docs = @(Get-Item (Join-Path $root 'README.md'))
 foreach ($d in 'docs\viva', 'docs\demo') { $p = Join-Path $root $d; if (Test-Path $p) { $docs += Get-ChildItem $p -Filter *.md } }
-$tr = Join-Path $root 'docs\TEST_REPORT.md'; if (Test-Path $tr) { $docs += Get-Item $tr }
+foreach ($extra in 'docs\TEST_REPORT.md', 'docs\FINAL_CHECKLIST.md') { $e = Join-Path $root $extra; if (Test-Path $e) { $docs += Get-Item $e } }
 
 $javaFiles = @{}
 Get-ChildItem $root -Recurse -Filter *.java -File | Where-Object { $_.FullName -notmatch '\\target\\' } | ForEach-Object { $javaFiles[$_.BaseName] = $_.FullName }

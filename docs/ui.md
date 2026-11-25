@@ -43,7 +43,7 @@ Do not start L2 until `docs/tracker.md` shows every Must item finished.
    - Admin: resolve `{{incidentId}}`
    - USER tries dispatch (expect 403)
 5. **4 - Notifications**: list, mark read
-6. **5 - Responders**: list all, list `status=AVAILABLE`, set OFFLINE/AVAILABLE (admin)
+6. **5 - Responders**: list all, list `status=AVAILABLE`, set OFFLINE/AVAILABLE (admin) - **not built** (stretch endpoint), so the collection only has the read requests
 7. **6 - Resilience demo**: report incident while responder-service is scaled to 0 (expect `PENDING`), list responders (expect 503)
 
 ### Auth handling

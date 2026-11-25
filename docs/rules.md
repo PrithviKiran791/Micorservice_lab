@@ -16,10 +16,10 @@ Rule ids (for example `R-DB-2`) can be cited in commits and reviews.
 
 - **R-AR-1** One service = one database = one DB user. A service MUST NOT connect to another service's database.
 - **R-AR-2** Services MUST NOT share entity classes, DTO classes, or a common domain library. Duplicate small DTOs instead.
-- **R-AR-3** Allowed inter-service calls are exactly: incident -> responder (sync REST) and incident -> notification (async event via RabbitMQ). Anything else needs approval.
+- **R-AR-3** Allowed inter-service calls are exactly: incident -> responder (sync REST) and incident -> notification (async event via RabbitMQ), plus registration with and lookup in discovery-service, and the gateway routing to the services. Anything else needs approval.
 - **R-AR-4** All external traffic MUST enter through the gateway. Business services MUST be `ClusterIP`.
 - **R-AR-5** `/internal/**` endpoints MUST NOT be routed by the gateway nor exposed by NodePort/Ingress.
-- **R-AR-6** Service discovery is Kubernetes DNS (`http://responder-service:8083`). No Eureka, no hard-coded IPs.
+- **R-AR-6** Service discovery is Eureka: the gateway routes `lb://<service-name>` and incident-service calls `http://responder-service` through a `@LoadBalanced` client. Kubernetes DNS is used only for infrastructure (`postgres`, `rabbitmq`, `discovery-service`). No hard-coded IPs. (Changed from "Kubernetes DNS, no Eureka" because the lab rubric requires Eureka; see decision D9.)
 - **R-AR-7** Remote calls MUST NOT run inside an open database transaction. Save and commit, call, then update.
 
 ## 3. Coding rules
@@ -64,7 +64,7 @@ Rule ids (for example `R-DB-2`) can be cited in commits and reviews.
 - **R-RS-2** A business `409 NO_RESPONDER_AVAILABLE` MUST NOT count as a circuit-breaker failure but MUST result in `PENDING`.
 - **R-RS-3** Other endpoints (login, list incidents, notifications) MUST NOT depend on responder-service being up.
 - **R-RS-4** Every pod MUST define liveness and readiness probes via Actuator; readiness MUST NOT be `UP` until the DB (and broker, where used) is reachable.
-- **R-RS-5** Retries only for idempotent calls; at most one retry for assign.
+- **R-RS-5** Retries only for idempotent calls; at most one retry for assign (none is configured). The gateway retries GET requests only (at most 2 retries); POST is never retried automatically.
 
 ## 8. Security rules
 
@@ -79,11 +79,11 @@ Rule ids (for example `R-DB-2`) can be cited in commits and reviews.
 ## 9. Kubernetes and Docker rules
 
 - **R-K8-1** Everything lives in namespace `resqnet`; manifests live in `k8s/`, one file per concern, numbered for apply order.
-- **R-K8-2** Image names: `resqnet/<service>:1.0`; `imagePullPolicy: IfNotPresent`; images built with Minikube's Docker daemon (`minikube docker-env`).
+- **R-K8-2** Image names: `resqnet/<service>:1.0`; `imagePullPolicy: IfNotPresent`; images are built with Docker Desktop and copied into Minikube with `minikube image load` (`minikube docker-env` does not work with the containerd runtime this cluster uses).
 - **R-K8-3** Every Deployment MUST have resource requests/limits, probes, and configuration from env/ConfigMap/Secret. No hard-coded URLs in images.
 - **R-K8-4** Only `api-gateway` is exposed (NodePort 30080 or port-forward). Postgres/RabbitMQ/services are `ClusterIP`.
 - **R-K8-5** Dockerfiles MUST be minimal: `eclipse-temurin:17-jre`, copy the built jar, run it. Build the jar with Maven before building the image.
-- **R-K8-6** JVM memory MUST be capped (`-XX:MaxRAMPercentage=70` and container limit ~512Mi) so the whole stack fits in 4 GB.
+- **R-K8-6** JVM memory MUST be capped (`-XX:MaxRAMPercentage=60`, serial GC, C1 compiler, `-Xss512k`, container limit 768Mi) so the whole stack fits on a laptop.
 - **R-K8-7** The resilience demo uses `kubectl scale deploy/responder-service --replicas=0/1`; do not delete the Deployment.
 
 ## 10. Git rules

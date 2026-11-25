@@ -259,8 +259,10 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
 | [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
 | [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
-| [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 34 likely questions with answers |
+| [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 35 likely questions with answers |
 | [`docs/viva/QUICK_REVISION.md`](docs/viva/QUICK_REVISION.md) | one-page revision sheet |
+| [`docs/viva/STUDY_PLAN.md`](docs/viva/STUDY_PLAN.md) | 3-hour plan: big picture, IntelliJ code tour (12 stops), demo practice, questions out loud, "what if" drills |
+| [`docs/FINAL_CHECKLIST.md`](docs/FINAL_CHECKLIST.md) | final deliverables and the eight lab criteria with evidence; owner actions |
 | [`docs/viva/CODE_REFERENCES.md`](docs/viva/CODE_REFERENCES.md) | 43 generated file:line references, checked by `scripts/verify-references.ps1` |
 | [`docs/demo/DEMO_SCRIPT.md`](docs/demo/DEMO_SCRIPT.md) | timed 5-minute demo (what to type, what happens, what to say) |
 | [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) | all test results; Part A application, Part B scripts and documents, and a list of what was NOT independently verified |

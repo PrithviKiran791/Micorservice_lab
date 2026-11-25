@@ -4,7 +4,7 @@
 |---|---|
 | Product | ResQNet Lite - Distributed Emergency Response Coordination (simulation) |
 | Context | Microservices Lab project (20 marks), Spring Boot + Kubernetes (Minikube) |
-| Status | Draft v1.0 |
+| Status | v1.1 - updated on 25 Nov 2026 to match what was built and the 8-criteria lab rubric |
 | Date | 25 Nov 2026 |
 | Presentation | Within ~16 hours of this document |
 
@@ -36,11 +36,14 @@ of failing completely - the core learning outcome of the lab.
 | G4 | Show one service down while the others still respond | Resilience (4) |
 | G5 | Reject unauthenticated requests at the gateway | Security (3) |
 | G6 | Be demo-able end to end in under 5 minutes | All |
+| G7 | Service discovery with Eureka and one gateway entry point | Service discovery and gateway |
+| G8 | Share load between several copies of a service and show it with a multi-user load test | Handles traffic |
+| G9 | JUnit tests in every service, documented in a test report | Testing |
 
 ## 4. Non-goals (explicitly out of scope)
 
 - Real maps, routing, GPS, or live responder tracking
-- Autoscaling (HPA), load testing, public cloud hosting, Ingress controllers
+- Autoscaling (HPA), public cloud hosting (the public link is only a temporary tunnel to the laptop), Ingress controllers
 - Redis, WebSockets, Kafka, Prometheus, Grafana
 - Payments, SMS/email delivery, mobile apps
 - Refresh tokens, token revocation, OAuth/OIDC
@@ -110,10 +113,13 @@ As the platform, every request except register, login and health requires a vali
 | FR-7 | Incident service publishes `incident.assigned` / `incident.pending` events to RabbitMQ | Must |
 | FR-8 | Notification service consumes events, stores notifications, de-duplicates by `eventId` | Must |
 | FR-9 | Each service uses its own PostgreSQL database and credentials | Must |
-| FR-10 | Responder service lists/creates responders and changes availability | Should |
+| FR-10 | Responder service lists/creates responders and changes availability | Should (listing built; create / set OFFLINE **not built**) |
 | FR-11 | Notifications can be marked as read | Should |
-| FR-12 | Scheduled auto-retry of `PENDING` incidents every 30 s | Could |
-| FR-13 | Static demo page served by the gateway | Could |
+| FR-12 | Scheduled auto-retry of `PENDING` incidents every 30 s | Could (not built; admin dispatch is manual) |
+| FR-13 | Static demo page served by the gateway | Could (not built; Postman and scripts are the demo clients) |
+| FR-14 | Eureka registry; gateway routes by service name; incident-service runs 2 copies | Must (added for the 8-criteria rubric) |
+| FR-15 | Gateway retries failed GET requests on another copy | Should (added) |
+| FR-16 | Temporary public link to the gateway (Cloudflare quick tunnel) | Could (added) |
 
 ## 8. Non-functional requirements
 
@@ -151,7 +157,7 @@ a second replica of `incident-service` to show load balancing, NetworkPolicy for
 
 ## 11. Success metrics
 
-- All five rubric rows demonstrably satisfied in the live demo.
+- All eight lab criteria demonstrably satisfied (see the rubric table in `docs/tracker.md` and `docs/TEST_REPORT.md`).
 - Demo completes without restarting any pod manually (other than the planned scale actions).
 - Teacher questions about sync vs async, database-per-service and circuit breaker are answerable from `docs/Architecture.md`.
 

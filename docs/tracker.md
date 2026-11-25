@@ -9,7 +9,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | All phases done; public link added; remaining: owner-side checks listed in docs/TEST_REPORT.md |
+| Phase | ALL PHASES (0-7) DONE; only owner-side checks remain (docs/FINAL_CHECKLIST.md section C) |
 | Next action | Owner checks the items under "NOT independently verified" in docs/TEST_REPORT.md, incl. the public link from a phone |
 | Blockers | None. Owner to try the public link from a phone on mobile data |
 | Last updated | 25 Nov 2026 |
@@ -35,11 +35,11 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [x] Maven 3.10.2 (builds verified with JAVA_HOME=JDK 17)
 - [x] Git
 - [x] kubectl + Minikube installed; `minikube start --driver=docker --cpus=4 --memory=4096`; `kubectl get nodes` is `Ready`
-- [ ] IntelliJ IDEA (or VS Code with Java extensions) and Postman
+- [ ] IntelliJ IDEA and Postman installed and opened on the evaluation machine (**owner**: I cannot check this; the collection itself was run with newman)
 - [x] Project folder `C:\dev\resqnet-lite`, `git init`, `k8s/`, `docs/`, `postman/` created
 - [x] Copy the 9 documents into the repo (`AGENTS.md` at root, others in `docs/`)
 - [x] Five Spring Boot projects generated from start.spring.io (Java 17, Maven) and each `mvn clean compile` succeeds
-- [ ] Images pre-pulled: `postgres:16`, `rabbitmq:3-management`, `eclipse-temurin:17-jre`
+- [x] Images cached: `postgres:16` and `rabbitmq:3-management` are inside Minikube (`minikube image ls`) together with the 6 `resqnet/*:1.0` images, so the demo also runs offline; `eclipse-temurin:17-jre` is only a Docker build base and is on Docker Desktop
 
 ## Phase 1 - Foundation (Hours 0-4)
 
@@ -88,21 +88,21 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 5 - Demo readiness (Hours 14-16)
 
-- [ ] Postman collection finished with tests; exported to `postman/`
-- [ ] Demo script rehearsed twice from a clean cluster (`kubectl delete ns resqnet` then re-apply)
-- [ ] Backup: screenshots or a short screen recording of a successful run
-- [ ] Architecture slide (diagram from `docs/Architecture.md`)
-- [ ] Teacher Q&A table in `docs/Architecture.md` section 15 read through
-- [ ] Laptop prepared: charged, Docker Desktop and Minikube already started, other apps closed
+- [x] Postman collection finished with tests; exported to `postman/` (28 requests; newman: 43 assertions pass; admin create/offline responder endpoints are not built)
+- [x] Full rehearsal passed 4 times from a clean cluster (`scripts/rehearsal.ps1`, last one with `-Rebuild`; logs in `docs/evidence/`); the human script is `docs/demo/DEMO_SCRIPT.md` (followed once from the first line on the live cluster)
+- [ ] Backup: screenshots or a short screen recording of a successful run (**owner**: needs your screen; text evidence is in `docs/evidence/`)
+- [x] Architecture diagrams: six PNGs with Mermaid sources in `docs/diagrams/` (slide = `01-system-architecture.png`)
+- [x] Teacher Q&A: `docs/viva/VIVA_SCRIPT.md` section G (35 questions) and `docs/Architecture.md` section 15
+- [ ] Laptop prepared: charged, Docker Desktop and Minikube already started, other apps closed (**owner**)
 
 ## Stretch (only if every MVP item above is done)
 
-- [ ] `POST/PATCH /responders` admin endpoints
-- [ ] Scheduler: auto-retry `PENDING` incidents every 30 s
-- [ ] Static demo page (see `docs/ui.md`)
-- [ ] 2 replicas of incident-service and gateway (show load balancing)
-- [ ] NetworkPolicy restricting `responder-service` to incident-service
-- [ ] Dead-letter queue for bad messages
+- [ ] `POST/PATCH /responders` admin endpoints (stretch, **not built**)
+- [ ] Scheduler: auto-retry `PENDING` incidents every 30 s (stretch, **not built**; admin dispatch is manual)
+- [ ] Static demo page (see `docs/ui.md`) (stretch, **not built**; Postman and scripts are the demo clients)
+- [~] 2 replicas of incident-service and gateway: incident-service x2 is **done and load-tested**; the gateway stays at 1 replica
+- [ ] NetworkPolicy restricting `responder-service` to incident-service (stretch, **not built**)
+- [ ] Dead-letter queue for bad messages (stretch, **not built**; bad messages are rejected without requeue)
 
 ## Risks
 
@@ -168,6 +168,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Phase 5 rehearsal run attempt 1 FAILED at deploy (8+ min, pods killed by the 200 s startup probe; Windows memory exhausted, JVM steps taking 30-80 s); also found my runner swallowed child output. Fixed (lighter JVM flags, probe 450 s, deploy wait 900 s, Out-Host). **Run 1 PASS** (deploy 90 s, smoke 32/32, resilience 16/16, newman 43/43, load 1500x200 at 146 req/s p95 271 ms 50/50 split, references 40/40); **run 2 PASS** (deploy 104 s, same checks, load 127 req/s p95 295 ms); all 9 pods 0 restarts | Done |
 | 25 Nov 2026 | Claude | Gateway retry. Before (old gateway): deleting one incident pod under traffic -> 9 of 32 GETs failed (eight 503 + one 30 s hang). After: 114 of 114 GETs returned 200, slowest 1.08 s (first attempt with a 2 s connect timeout: 107/107 OK but slowest 2.09 s, so the timeout was lowered to 1 s). Gateway tests 14/14 (new GatewayRetryTest: GETs succeed with one dead copy; POSTs not retried; fails without the retry config). My own script bug found on the way (PowerShell passed -split to kubectl) | Done |
 | 25 Nov 2026 | Claude | Rehearsal run 3 (with failover step) first attempt FAILED one check: GET /api/responders returned 503 right after dispatch worked (gateway registry copy lags up to ~13 s). Check now polls; passed after 3 s. **Run 3 PASS**: deploy 80 s, smoke 32/32, resilience 16/16, failover 7/7 (111/111 x 200, slowest 1.09 s), newman 43/43, load 1500 x 200 at 136 req/s p95 236 ms (50/50 split), references 43/43, 0 restarts | Done |
+| 25 Nov 2026 | Claude | Phase 7 (final QA, documents vs implementation): audited the original design documents against what was built and fixed stale statements - Architecture.md (six apps, Eureka paragraph, discovery row, 2 replicas, 768Mi/JVM flags, startup probe, EUREKA_URL, D9 Eureka and D10 GET retry decisions), rules.md (R-AR-6 now Eureka, R-AR-3, R-RS-5, R-K8-2 image load, R-K8-6), AGENTS.md (discovery-service, Eureka, no docker-env), PRD.md (v1.1: goals G7-G9, FR-14..16, not-built markers), API_CONTRACT.md (lb:// names, GET retry, X-Served-By), ui.md. Tracker audited: found my earlier -like ticks never matched because [ ] is a wildcard class; ticked verified items (Postman, rehearsals, diagrams, Q&A, images cached in Minikube) and labelled the rest owner-side or not-built stretch. Added docs/viva/STUDY_PLAN.md (3-hour plan, IntelliJ code tour) and docs/FINAL_CHECKLIST.md; verify-docs now also covers FINAL_CHECKLIST (298 references correct, 0 wrong; first run caught 3 shorthand paths in my study plan, fixed) | Done |
 | 25 Nov 2026 | Claude | Public URL: owner chose a Cloudflare quick tunnel. Downloaded cloudflared-windows-amd64.exe 2026.11.2 (52.9 MB) from the official cloudflare/cloudflared GitHub release into tools/cloudflared/ (git-ignored); SHA-256 equals the release digest, signature Valid (Cloudflare, Inc.). scripts/start-public-url.ps1: first run failed on a locked log file, fixed; `-Check` run: public address https://ready-fifth-mileage-processing.trycloudflare.com answered, smoke test 37/37 through it, tunnel closed, no process left. README/DEMO_SCRIPT/VIVA/TEST_REPORT updated | Done |
 | 25 Nov 2026 | Claude | Phase 7 final QA: `rehearsal.ps1 -Rebuild` from a deleted namespace PASSED (6 jars + 6 images rebuilt, deploy 258 s, smoke 37/37, resilience 16/16, failover 7/7, newman 43/43, load 1500 x 200 at 151 req/s p95 208 ms, 251/249 split, refs 43/43, 9 pods 0 restarts) | Done |
 | 25 Nov 2026 | Claude | Phase 6: wrote docs/viva/VIVA_SCRIPT.md, QUICK_REVISION.md, docs/demo/DEMO_SCRIPT.md, docs/TEST_REPORT.md; 6 Mermaid diagrams rendered to PNG with mermaid-cli (Edge as browser) and each PNG viewed (2 simplified after first render, 1 syntax error fixed); scripts/run-unit-tests.ps1 (51 tests PASS: auth 5, gateway 14, responder 4, incident 19, notification 9); scripts/verify-docs.ps1 (first run found 9 wrong references in my docs, fixed; final 236 correct / 0 wrong; negative test catches missing file, bad option, missing method, unknown k8s name); forged/expired/wrong-issuer token checks added to smoke-test.ps1 (now 37/37); DEMO_SCRIPT followed from the first line on the live cluster: all steps as documented | Done |

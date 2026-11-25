@@ -47,6 +47,7 @@ resqnet-lite/
   incident-service/        incidents, sync call + event publisher, port 8082, incident_db
   responder-service/       responders, atomic assignment, port 8083, responder_db
   notification-service/    consumes events, stores notifications, port 8084, notification_db
+discovery-service/       Eureka service registry, port 8761, no database
   k8s/                     all Kubernetes manifests (namespace: resqnet)
   postman/                 ResQNet-Lite.postman_collection.json
   docker-compose.yml       local Postgres + RabbitMQ
@@ -61,6 +62,7 @@ Sub-packages: `controller`, `service`, `repository`, `model`, `dto`, `config`,
 - Java 17, Maven, Spring Boot 3.x (latest stable 3.x chosen at project generation)
 - Spring Cloud release train that matches the chosen Boot version
 - Spring Cloud Gateway (reactive) for the gateway only
+- Netflix Eureka (discovery-service) + Spring Cloud LoadBalancer: the gateway routes `lb://<service-name>` and incident-service uses a `@LoadBalanced` RestClient (decision D9 in docs/Architecture.md)
 - Spring Web + Spring Data JPA + PostgreSQL 16 in the four business services
 - Spring AMQP + RabbitMQ 3 (management image) for events
 - Resilience4j (circuit breaker, time limit) in `incident-service`
@@ -86,8 +88,10 @@ mvn test
 
 # Minikube
 minikube start --driver=docker --cpus=4 --memory=4096
-& minikube -p minikube docker-env --shell powershell | Invoke-Expression   # per terminal window
+# Minikube here uses the containerd runtime, so `minikube docker-env` does NOT work. Build with Docker Desktop, then copy the image in:
 docker build -t resqnet/auth-service:1.0 ./auth-service
+minikube image load resqnet/auth-service:1.0
+# or do everything (jars, images, apply, wait) with:  .\scripts\deploy-minikube.ps1
 kubectl apply -f k8s/
 kubectl -n resqnet get pods
 kubectl -n resqnet logs deploy/incident-service --tail=100
@@ -159,7 +163,8 @@ For JSON bodies in PowerShell, use `-d "@body.json"` instead of inline quotes.
 - **auth-service security:** if `spring-boot-starter-security` is on the classpath it locks every
   endpoint by default. Prefer the `spring-security-crypto` dependency (BCrypt only), or add a
   `SecurityFilterChain` that permits all (the gateway is the guard).
-- **Minikube images:** build images in a terminal where `minikube docker-env` was applied, and set
+- **Minikube images:** this Minikube uses containerd, so `minikube docker-env` fails. Build with Docker Desktop and run
+  `minikube image load resqnet/<service>:1.0` (`scripts/deploy-minikube.ps1` does it), and set
   `imagePullPolicy: IfNotPresent`, otherwise pods show `ErrImagePull`.
 - **NodePort on Windows + docker driver** is not directly reachable; use
   `kubectl port-forward` or `minikube service api-gateway -n resqnet --url`.

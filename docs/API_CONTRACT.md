@@ -29,6 +29,8 @@ If code and this document disagree, fix one of them in the same commit.
 
 The gateway removes the `/api` prefix (`StripPrefix=1`). Document paths below are the **public** ones.
 
+Targets are found **by name through Eureka** (`lb://auth-service`, `lb://incident-service` ...): when several copies of a service run, requests are shared round-robin. Failed **GET** requests (connection refused, reset, timeout, 502/503/504) are retried on another copy, at most 2 times; **POST/PATCH are never retried automatically**. Every service adds a response header `X-Served-By: <pod name>` so the load-balancing demo can show which copy answered.
+
 ### Identity headers (gateway -> services, never from clients)
 
 `X-User-Id`, `X-User-Name`, `X-User-Role`. See `docs/AUTHENTICATION.md`.
