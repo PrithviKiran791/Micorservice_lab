@@ -23,8 +23,8 @@ spec:
           env:
             - name: EUREKA_URL
               valueFrom: { configMapKeyRef: { name: resqnet-config, key: EUREKA_URL } }
-            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
-              value: "-XX:MaxRAMPercentage=70"
+            - name: JAVA_TOOL_OPTIONS         # small, quick-starting JVM so everything fits in the cluster (R-K8-6): heap cap, serial GC, C1 compiler only, small stacks
+              value: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k"
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: resqnet-secrets, key: JWT_SECRET } }
             - name: JWT_ISSUER
@@ -33,7 +33,7 @@ spec:
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: 8080 }
             periodSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 90
           # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8080 }
@@ -46,7 +46,7 @@ spec:
             failureThreshold: 3
           resources:
             requests: { memory: 256Mi, cpu: 100m }
-            limits: { memory: 512Mi }
+            limits: { memory: 768Mi }
 ---
 apiVersion: v1
 kind: Service

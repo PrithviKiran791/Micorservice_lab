@@ -93,7 +93,7 @@ if (-not $SkipImages) {
 # ---- 5. wait ----------------------------------------------------------------------------------------
 Step 'Wait for pods to become Ready'
 foreach ($d in @('postgres', 'rabbitmq') + $services) {
-    kubectl -n $ns rollout status "deploy/$d" --timeout=300s
+    kubectl -n $ns rollout status "deploy/$d" --timeout=900s
     if ($LASTEXITCODE -ne 0) {
         kubectl -n $ns get pods
         Fail "deployment $d did not become Ready (see: kubectl -n $ns logs deploy/$d)"

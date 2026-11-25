@@ -31,8 +31,8 @@ spec:
               valueFrom: { configMapKeyRef: { name: resqnet-config, key: EUREKA_URL } }
             - name: RESPONDER_SERVICE_URL
               valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
-            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
-              value: "-XX:MaxRAMPercentage=70"
+            - name: JAVA_TOOL_OPTIONS         # small, quick-starting JVM so everything fits in the cluster (R-K8-6): heap cap, serial GC, C1 compiler only, small stacks
+              value: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k"
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres:5432/incident_db"
             - name: SPRING_DATASOURCE_USERNAME
@@ -51,7 +51,7 @@ spec:
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: 8082 }
             periodSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 90
           # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8082 }
@@ -64,7 +64,7 @@ spec:
             failureThreshold: 3
           resources:
             requests: { memory: 256Mi, cpu: 100m }
-            limits: { memory: 512Mi }
+            limits: { memory: 768Mi }
 ---
 apiVersion: v1
 kind: Service

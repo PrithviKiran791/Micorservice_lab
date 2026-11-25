@@ -1,0 +1,362 @@
+# Output of scripts\rehearsal.ps1 (clean cluster, run 1), captured 25 Nov 2026
+
+=== Delete namespace resqnet (clean cluster)
+namespace "resqnet" deleted
+
+=== Deploy to Minikube
+
+=== Preflight: Docker, Minikube, kubectl
+OK (context: minikube)
+
+=== Apply k8s/ manifests
+namespace/resqnet created
+secret/resqnet-secrets created
+configmap/resqnet-config created
+configmap/postgres-init created
+persistentvolumeclaim/postgres-data created
+deployment.apps/postgres created
+service/postgres created
+deployment.apps/rabbitmq created
+service/rabbitmq created
+deployment.apps/discovery-service created
+service/discovery-service created
+deployment.apps/auth-service created
+service/auth-service created
+deployment.apps/incident-service created
+service/incident-service created
+deployment.apps/responder-service created
+service/responder-service created
+deployment.apps/notification-service created
+service/notification-service created
+deployment.apps/api-gateway created
+service/api-gateway created
+
+=== Wait for pods to become Ready
+Waiting for deployment "postgres" rollout to finish: 0 of 1 updated replicas are available...
+deployment "postgres" successfully rolled out
+Waiting for deployment "rabbitmq" rollout to finish: 0 of 1 updated replicas are available...
+deployment "rabbitmq" successfully rolled out
+deployment "discovery-service" successfully rolled out
+deployment "auth-service" successfully rolled out
+deployment "incident-service" successfully rolled out
+deployment "responder-service" successfully rolled out
+Waiting for deployment "notification-service" rollout to finish: 0 of 1 updated replicas are available...
+deployment "notification-service" successfully rolled out
+deployment "api-gateway" successfully rolled out
+
+=== Result
+NAME                                   READY   STATUS    RESTARTS   AGE
+api-gateway-544cf7fb5c-8hm5v           1/1     Running   0          86s
+auth-service-649c96c94d-c72bl          1/1     Running   0          87s
+discovery-service-c47f7987c-4s8zc      1/1     Running   0          87s
+incident-service-7784d44bbd-cc7cq      1/1     Running   0          86s
+incident-service-7784d44bbd-mf5hj      1/1     Running   0          86s
+notification-service-77cd6cdcc-z2kb8   1/1     Running   0          86s
+postgres-69c5dcdd4f-nnhv5              1/1     Running   0          87s
+rabbitmq-7698d4c8c5-s95ks              1/1     Running   0          87s
+responder-service-7c978558ff-kshz7     1/1     Running   0          86s
+
+Reach the gateway with:  kubectl -n resqnet port-forward svc/api-gateway 8080:8080
+Gateway not reachable on http://localhost:8080 - starting: kubectl port-forward svc/api-gateway 8080:8080
+
+=== smoke-test.ps1
+
+=== 1. Health and gateway security
+PASS  GET /actuator/health (public)                                          -> 200
+PASS  GET /api/incidents without token is rejected                           -> 401
+PASS  GET /api/incidents with a garbage token is rejected                    -> 401
+PASS  POST /internal/... is not routed by the gateway                        -> 404
+
+=== 2. Register and login
+PASS  register a new user                                                    -> 201 role=USER
+PASS  register the same username again                                       -> 409 USERNAME_TAKEN
+PASS  registering with role ADMIN still gives USER                           -> role=USER
+PASS  login with a wrong password                                            -> 401
+PASS  login                                                                  -> 200
+PASS  admin login (seeded account)                                           -> 200
+PASS  GET /api/auth/me                                                       -> 200
+
+=== 3. Report an incident (synchronous call incident -> responder)
+PASS  POST /api/incidents returns 201 with a status                          -> 201 ASSIGNED
+PASS  an ambulance is assigned                                               -> Ambulance Charlie
+PASS  owner can read the incident                                            -> 200
+PASS  USER list contains only own incidents                                  -> count=1
+
+=== 4. Asynchronous event -> notification
+PASS  a notification arrives through RabbitMQ                                -> 1 notification(s)
+PASS  notification type is INCIDENT_ASSIGNED and mentions the incident       -> Incident #4 (MEDICAL, CRITICAL) assigned to Ambulance Charlie.
+PASS  owner marks the notification as read                                   -> 200
+
+=== 5. Roles: USER versus ADMIN
+PASS  USER on admin endpoint /dispatch                                       -> 403
+PASS  USER with a forged X-User-Role: ADMIN header is still refused          -> 403
+PASS  USER on admin endpoint /resolve                                        -> 403
+PASS  another user cannot read this user's incident                          -> 403
+PASS  another user sees none of these notifications                          -> count=0
+PASS  ADMIN list includes the incident                                       -> 200
+
+=== 6. Admin dispatch and resolve
+PASS  dispatching an incident that is not PENDING gives 409                  -> 409 INVALID_STATE
+PASS  ADMIN resolves the incident (responder is freed)                       -> 200 RESOLVED
+PASS  resolving twice gives 409                                              -> 409
+PASS  unknown incident id gives 404                                          -> 404
+
+=== 7. Responders and validation
+PASS  GET /api/responders (any logged-in user)                               -> count=9
+PASS  responders can be filtered                                             -> count=1
+PASS  invalid incident gives 400 with field details                          -> 400 details=2
+PASS  invalid registration gives 400                                         -> 400
+
+smoke-test: 32 passed, 0 failed
+
+=== demo-resilience.ps1
+
+=== 1. Normal state
+PASS  incident is ASSIGNED while everything is up                            -> 201 ASSIGNED Fire Truck One
+PASS  GET /api/responders works                                              -> 200
+
+=== 2. responder-service goes DOWN (scale to 0)
+PASS  responder-service has no pods any more                                 
+
+=== 3. The other services still answer
+PASS  new incident is accepted: 201 with status PENDING                      -> 201 PENDING
+PASS  the answer came back quickly (fallback, under 3 s)                     -> 38 ms
+PASS  a second incident is also PENDING (circuit breaker may be open now)    -> 201 PENDING in 41 ms
+PASS  GET /api/responders gives 503 (expected: that service is down)         -> 503
+PASS  login still works                                                      -> 200
+PASS  listing incidents still works                                          -> count=3
+PASS  reading a PENDING incident still works                                 -> 200
+PASS  the "waiting for a responder" notification arrived (RabbitMQ)          -> 2 pending notification(s)
+PASS  resolving a PENDING incident is refused (409)                          -> 409
+
+=== 4. responder-service comes BACK (scale to 1)
+PASS  responder-service pod is Ready again                                   
+
+=== 5. Dispatch the waiting incident
+PASS  ADMIN dispatch turns the PENDING incident into ASSIGNED                -> ASSIGNED Fire Truck Two
+PASS  the "assigned" notification arrived                                    
+PASS  GET /api/responders works again                                        -> 200
+
+demo-resilience: 16 passed, 0 failed
+
+=== Postman collection (newman, folders 0-5)
+newman
+
+ResQNet Lite
+
+□ 0 - Health
+└ Gateway health
+  GET http://localhost:8080/actuator/health [200 OK, 148B, 40ms]
+  √  status is 200
+  √  status is UP
+
+□ 1 - Security
+└ Incidents without token (expect 401)
+  GET http://localhost:8080/api/incidents [401 Unauthorized, 237B, 7ms]
+  √  status is 401
+  √  code is UNAUTHORIZED
+
+└ Incidents with garbage token (expect 401)
+  GET http://localhost:8080/api/incidents [401 Unauthorized, 237B, 6ms]
+  √  status is 401
+
+└ Internal endpoint is not routed (expect 404)
+  POST http://localhost:8080/internal/responders/assign [404 Not Found, 235B, 7ms]
+  √  status is 404
+
+□ 2 - Auth
+└ Register user
+  POST http://localhost:8080/api/auth/register [201 Created, 257B, 86ms]
+  √  status is 201
+  √  role is USER
+
+└ Register the same user again (expect 409)
+  POST http://localhost:8080/api/auth/register [409 Conflict, 324B, 12ms]
+  √  status is 409
+  √  code is USERNAME_TAKEN
+
+└ Login user (stores userToken)
+  POST http://localhost:8080/api/auth/login [200 OK, 498B, 80ms]
+  √  status is 200
+  √  token received
+
+└ Login wrong password (expect 401)
+  POST http://localhost:8080/api/auth/login [401 Unauthorized, 337B, 79ms]
+  √  status is 401
+  √  code is INVALID_CREDENTIALS
+
+└ Login admin (stores adminToken)
+  POST http://localhost:8080/api/auth/login [200 OK, 487B, 82ms]
+  √  status is 200
+  √  role is ADMIN
+
+└ Me
+  GET http://localhost:8080/api/auth/me [200 OK, 207B, 10ms]
+  √  status is 200
+  √  is the registered user
+
+□ 3 - Incidents
+└ Report MEDICAL / CRITICAL (expect ASSIGNED)
+  POST http://localhost:8080/api/incidents [201 Created, 587B, 40ms]
+  √  created
+  √  has status
+  √  ambulance named when ASSIGNED
+
+└ Report FIRE / MEDIUM
+  POST http://localhost:8080/api/incidents [201 Created, 568B, 38ms]
+  √  created
+  √  has status
+
+└ Report with invalid body (expect 400)
+  POST http://localhost:8080/api/incidents [400 Bad Request, 436B, 10ms]
+  √  status is 400
+  √  field details present
+
+└ List my incidents
+  GET http://localhost:8080/api/incidents [200 OK, 972B, 20ms]
+  √  status is 200
+  √  contains my incident
+
+└ Admin: list all incidents
+  GET http://localhost:8080/api/incidents [200 OK, 3.79kB, 16ms]
+  √  status is 200
+  √  is an array
+
+└ Get my incident by id
+  GET http://localhost:8080/api/incidents/8 [200 OK, 576B, 11ms]
+  √  status is 200
+
+└ USER tries dispatch (expect 403)
+  POST http://localhost:8080/api/incidents/8/dispatch [403 Forbidden, 337B, 9ms]
+  √  status is 403
+  √  code is FORBIDDEN
+
+└ Admin: dispatch (409 if the incident is not PENDING)
+  POST http://localhost:8080/api/incidents/8/dispatch [409 Conflict, 350B, 11ms]
+  √  200 when it was PENDING, otherwise 409 INVALID_STATE
+
+└ Admin: resolve (409 if the incident is not ASSIGNED)
+  POST http://localhost:8080/api/incidents/8/resolve [200 OK, 607B, 30ms]
+  √  200 RESOLVED, or 409 when it was still PENDING
+
+□ 4 - Notifications
+└ List my notifications
+  GET http://localhost:8080/api/notifications [200 OK, 548B, 14ms]
+  √  status is 200
+  √  at least one notification (event arrived)
+
+└ Mark the newest notification as read
+  PATCH http://localhost:8080/api/notifications/11/read [200 OK, 351B, 17ms]
+  √  status is 200
+  √  read is true
+
+□ 5 - Responders
+└ List all responders
+  GET http://localhost:8080/api/responders [200 OK, 1.15kB, 14ms]
+  √  status is 200
+  √  9 seeded responders
+
+└ List AVAILABLE ambulances
+  GET http://localhost:8080/api/responders?status=AVAILABLE&type=AMBULANCE [200 OK, 281B, 16ms]
+  √  status is 200
+  √  all AMBULANCE and AVAILABLE
+
+└ Bad status filter (expect 400)
+  GET http://localhost:8080/api/responders?status=BANANA [400 Bad Request, 335B, 16ms]
+  √  status is 400
+
+┌─────────────────────────┬──────────────────┬──────────────────┐
+│                         │         executed │           failed │
+├─────────────────────────┼──────────────────┼──────────────────┤
+│              iterations │                1 │                0 │
+├─────────────────────────┼──────────────────┼──────────────────┤
+│                requests │               24 │                0 │
+├─────────────────────────┼──────────────────┼──────────────────┤
+│            test-scripts │               24 │                0 │
+├─────────────────────────┼──────────────────┼──────────────────┤
+│      prerequest-scripts │                1 │                0 │
+├─────────────────────────┼──────────────────┼──────────────────┤
+│              assertions │               43 │                0 │
+├─────────────────────────┴──────────────────┴──────────────────┤
+│ total run duration: 2.6s                                      │
+├───────────────────────────────────────────────────────────────┤
+│ total data received: 10.19kB (approx)                         │
+├───────────────────────────────────────────────────────────────┤
+│ average response time: 27ms [min: 6ms, max: 86ms, s.d.: 25ms] │
+└───────────────────────────────────────────────────────────────┘
+
+=== load-test.ps1 (20 users in parallel)
+Preparing 20 demo users...
+Running: 20 users x 25 rounds x 3 endpoints = 1500 requests
+
+=== Result
+Total requests           1500
+Duration                 10.3 s  (146 requests/second)
+Latency                  avg 134 ms   p95 271 ms   max 498 ms
+HTTP status counts       200 x1500
+
+Who answered? (X-Served-By = pod name)
+/api/incidents  (2 pod(s) answered)
+    incident-service-7784d44bbd-cc7cq          250 requests  (50%)
+    incident-service-7784d44bbd-mf5hj          250 requests  (50%)
+/api/responders  (1 pod(s) answered)
+    responder-service-7c978558ff-bkd7z         500 requests  (100%)
+/api/notifications  (1 pod(s) answered)
+    notification-service-77cd6cdcc-z2kb8       500 requests  (100%)
+
+PASS: no errors, load shared by 2 incident-service pods.
+
+=== verify-references.ps1
+PASS  responder-service/src/main/java/com/resqnet/responder/repository/ResponderRepository.java:39  FOR UPDATE SKIP LOCKED
+PASS  responder-service/src/main/java/com/resqnet/responder/service/ResponderService.java:67  public AssignResponse assign(AssignRequest request)
+PASS  responder-service/src/main/java/com/resqnet/responder/service/ResponderService.java:70  repository.findByCurrentIncidentId(incidentId)
+PASS  responder-service/src/main/resources/schema.sql:11  CREATE UNIQUE INDEX IF NOT EXISTS uq_responder_current_incident
+PASS  responder-service/src/test/java/com/resqnet/responder/service/ResponderServiceConcurrencyTest.java:62  void concurrentAssignmentsNeverGiveTheSameResponder()
+PASS  incident-service/src/main/java/com/resqnet/incident/client/ResponderClient.java:43  @CircuitBreaker(name = "responderService", fallbackMethod = "assignFallback")
+PASS  incident-service/src/main/java/com/resqnet/incident/client/ResponderClient.java:58  public Optional<AssignedResponder> assignFallback
+PASS  incident-service/src/main/java/com/resqnet/incident/client/ResponderClient.java:51  catch (HttpClientErrorException.Conflict e)
+PASS  incident-service/src/main/resources/application.yml:38  failure-rate-threshold: 50
+PASS  incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:36  factory.setReadTimeout(readTimeoutMs);
+PASS  incident-service/src/main/java/com/resqnet/incident/service/IncidentService.java:52  Incident incident = repository.save(new Incident(
+PASS  incident-service/src/main/java/com/resqnet/incident/service/IncidentService.java:121  responderClient.assign(new AssignRequest(
+PASS  incident-service/src/test/java/com/resqnet/incident/service/IncidentFlowTest.java:161  void responderHangs_readTimeoutTriggersFallbackWithinAboutThreeSeconds()
+PASS  api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:92  Jwts.parser().verifyWith(key)
+PASS  api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:75  h.remove(HEADER_ROLE);
+PASS  api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:64  return Ordered.HIGHEST_PRECEDENCE;
+PASS  api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:109  .header(HEADER_ROLE, role)
+PASS  incident-service/src/main/java/com/resqnet/incident/security/CurrentUser.java:34  public void requireAdmin()
+PASS  api-gateway/src/test/java/com/resqnet/gateway/security/JwtAuthenticationFilterTest.java:81  void expiredTokenIsRejected()
+PASS  auth-service/src/main/java/com/resqnet/auth/service/AuthService.java:64  passwordEncoder.matches(request.password(), u.getPasswordHash())
+PASS  auth-service/src/main/java/com/resqnet/auth/service/AuthService.java:45  passwordEncoder.encode(request.password()), Role.USER
+PASS  discovery-service/src/main/java/com/resqnet/discovery/DiscoveryServiceApplication.java:12  @EnableEurekaServer
+PASS  api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:34  .uri("lb://incident-service"))
+PASS  incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:13  @LoadBalanced
+PASS  incident-service/src/main/resources/application.yml:66  defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+PASS  k8s/21-incident.yaml:8  replicas: 2
+PASS  incident-service/src/main/java/com/resqnet/incident/config/ServedByFilter.java:26  response.setHeader("X-Served-By", instanceName);
+PASS  incident-service/src/main/java/com/resqnet/incident/messaging/IncidentEventPublisher.java:38  rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey, event);
+PASS  incident-service/src/main/java/com/resqnet/incident/messaging/RabbitConfig.java:44  BindingBuilder.bind(notificationQueue).to(eventsExchange).with("incident.*");
+PASS  notification-service/src/main/java/com/resqnet/notification/messaging/IncidentEventListener.java:24  @RabbitListener(queues = RabbitConfig.QUEUE)
+PASS  notification-service/src/main/java/com/resqnet/notification/service/NotificationService.java:44  if (repository.existsByEventId(notification.getEventId()))
+PASS  notification-service/src/main/java/com/resqnet/notification/model/Notification.java:30  @Column(name = "event_id", nullable = false, unique = true)
+PASS  notification-service/src/test/java/com/resqnet/notification/service/NotificationServiceTest.java:87  void duplicateEventIdDoesNotCreateASecondNotification()
+PASS  db/init-databases.sh:19  REVOKE CONNECT ON DATABASE
+PASS  k8s/21-incident.yaml:37  jdbc:postgresql://postgres:5432/incident_db
+PASS  auth-service/Dockerfile:2  FROM eclipse-temurin:17-jre
+PASS  k8s/22-responder.yaml:19  name: wait-for-postgres
+PASS  k8s/22-responder.yaml:51  readinessProbe:
+PASS  k8s/30-gateway.yaml:57  type: NodePort
+PASS  scripts/deploy-minikube.ps1:76  minikube image load $image
+
+verify-references: 40 references, 40 correct, 0 wrong
+
+=== Rehearsal summary (4 min)
+Delete namespace resqnet (clean cluster)       PASS              53 s
+Deploy to Minikube                             PASS              90 s
+smoke-test.ps1                                 PASS               4 s
+demo-resilience.ps1                            PASS              41 s
+Postman collection (newman, folders 0-5)       PASS              15 s
+load-test.ps1 (20 users in parallel)           PASS              13 s
+verify-references.ps1                          PASS               1 s
+
+REHEARSAL PASSED

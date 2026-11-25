@@ -1,0 +1,925 @@
+{
+    "info":  {
+                 "name":  "ResQNet Lite",
+                 "description":  "Demo client for ResQNet Lite. Start the gateway first: kubectl -n resqnet port-forward svc/api-gateway 8080:8080. Run folders 0-5 in order (Collection Runner); folder 6 is the resilience demo and needs kubectl scale commands between its requests. Every request has status-code tests.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "auth":  {
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "type":  "string",
+                                    "value":  "{{userToken}}"
+                                }
+                            ],
+                 "type":  "bearer"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080"
+                     },
+                     {
+                         "key":  "username",
+                         "value":  "asha"
+                     },
+                     {
+                         "key":  "userToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "incidentId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "pendingId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "notificationId",
+                         "value":  ""
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "0 - Health",
+                     "description":  "The gateway answers without a token.",
+                     "item":  [
+                                  {
+                                      "name":  "Gateway health",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/actuator/health",
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027status is UP\u0027, () =\u003e pm.expect(pm.response.json().status).to.eql(\u0027UP\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "1 - Security",
+                     "description":  "Authentication is checked at the gateway: the request never reaches a service.",
+                     "item":  [
+                                  {
+                                      "name":  "Incidents without token (expect 401)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 401\u0027, () =\u003e pm.response.to.have.status(401));",
+                                                                                    "pm.test(\u0027code is UNAUTHORIZED\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Incidents with garbage token (expect 401)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "garbage.token.value"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 401\u0027, () =\u003e pm.response.to.have.status(401));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Internal endpoint is not routed (expect 404)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/internal/responders/assign",
+                                                      "body":  {
+                                                                   "raw":  "{ \"incidentId\": 1, \"incidentType\": \"FIRE\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{adminToken}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 404\u0027, () =\u003e pm.response.to.have.status(404));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "2 - Auth",
+                     "description":  "Register, login (stores userToken / adminToken) and who-am-I.",
+                     "item":  [
+                                  {
+                                      "name":  "Register user",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/register",
+                                                      "body":  {
+                                                                   "raw":  "{ \"username\": \"{{username}}\", \"password\": \"Pass@1234\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "// a fresh user name for every run, so the request never fails with 409",
+                                                                                    "pm.collectionVariables.set(\u0027username\u0027, \u0027asha\u0027 + Math.floor(Math.random() * 1000000));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "prerequest"
+                                                    },
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "pm.test(\u0027role is USER\u0027, () =\u003e pm.expect(pm.response.json().role).to.eql(\u0027USER\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Register the same user again (expect 409)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/register",
+                                                      "body":  {
+                                                                   "raw":  "{ \"username\": \"{{username}}\", \"password\": \"Pass@1234\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 409\u0027, () =\u003e pm.response.to.have.status(409));",
+                                                                                    "pm.test(\u0027code is USERNAME_TAKEN\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027USERNAME_TAKEN\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Login user (stores userToken)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/login",
+                                                      "body":  {
+                                                                   "raw":  "{ \"username\": \"{{username}}\", \"password\": \"Pass@1234\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const body = pm.response.json();",
+                                                                                    "pm.collectionVariables.set(\u0027userToken\u0027, body.token);",
+                                                                                    "pm.test(\u0027token received\u0027, () =\u003e pm.expect(body.token).to.be.a(\u0027string\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Login wrong password (expect 401)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/login",
+                                                      "body":  {
+                                                                   "raw":  "{ \"username\": \"{{username}}\", \"password\": \"wrong-password\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 401\u0027, () =\u003e pm.response.to.have.status(401));",
+                                                                                    "pm.test(\u0027code is INVALID_CREDENTIALS\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027INVALID_CREDENTIALS\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Login admin (stores adminToken)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/login",
+                                                      "body":  {
+                                                                   "raw":  "{ \"username\": \"admin\", \"password\": \"Admin@123\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const body = pm.response.json();",
+                                                                                    "pm.collectionVariables.set(\u0027adminToken\u0027, body.token);",
+                                                                                    "pm.test(\u0027role is ADMIN\u0027, () =\u003e pm.expect(body.user.role).to.eql(\u0027ADMIN\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Me",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/auth/me"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027is the registered user\u0027, () =\u003e pm.expect(pm.response.json().username).to.eql(pm.collectionVariables.get(\u0027username\u0027)));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "3 - Incidents",
+                     "description":  "Report incidents (synchronous call to responder-service) and manage them as admin.",
+                     "item":  [
+                                  {
+                                      "name":  "Report MEDICAL / CRITICAL (expect ASSIGNED)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "body":  {
+                                                                   "raw":  "{ \"type\": \"MEDICAL\", \"severity\": \"CRITICAL\", \"description\": \"Person collapsed near library\", \"locationText\": \"Main Library, Gate 2\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "pm.collectionVariables.set(\u0027incidentId\u0027, body.id);",
+                                                                                    "pm.test(\u0027created\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "pm.test(\u0027has status\u0027, () =\u003e pm.expect([\u0027ASSIGNED\u0027,\u0027PENDING\u0027]).to.include(body.status));",
+                                                                                    "pm.test(\u0027ambulance named when ASSIGNED\u0027, () =\u003e { if (body.status === \u0027ASSIGNED\u0027) { pm.expect(body.assignedResponder.type).to.eql(\u0027AMBULANCE\u0027); } });"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Report FIRE / MEDIUM",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "body":  {
+                                                                   "raw":  "{ \"type\": \"FIRE\", \"severity\": \"MEDIUM\", \"description\": \"Smoke from chemistry lab\", \"locationText\": \"Science Block\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "pm.test(\u0027created\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "pm.test(\u0027has status\u0027, () =\u003e pm.expect([\u0027ASSIGNED\u0027,\u0027PENDING\u0027]).to.include(body.status));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Report with invalid body (expect 400)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "body":  {
+                                                                   "raw":  "{ \"severity\": \"LOW\", \"description\": \"\", \"locationText\": \"x\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 400\u0027, () =\u003e pm.response.to.have.status(400));",
+                                                                                    "pm.test(\u0027field details present\u0027, () =\u003e pm.expect(pm.response.json().details.length).to.be.above(0));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "List my incidents",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027contains my incident\u0027, () =\u003e pm.expect(pm.response.json().some(i =\u003e i.id === pm.collectionVariables.get(\u0027incidentId\u0027))).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Admin: list all incidents",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{adminToken}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027is an array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Get my incident by id",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents/{{incidentId}}"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "USER tries dispatch (expect 403)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents/{{incidentId}}/dispatch"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 403\u0027, () =\u003e pm.response.to.have.status(403));",
+                                                                                    "pm.test(\u0027code is FORBIDDEN\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027FORBIDDEN\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Admin: dispatch (409 if the incident is not PENDING)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents/{{incidentId}}/dispatch",
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{adminToken}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               },
+                                                      "description":  "For the real dispatch demo use folder 6 (responder-service scaled to 0)."
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 when it was PENDING, otherwise 409 INVALID_STATE\u0027, () =\u003e pm.expect([200, 409]).to.include(pm.response.code));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Admin: resolve (409 if the incident is not ASSIGNED)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents/{{incidentId}}/resolve",
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{adminToken}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 RESOLVED, or 409 when it was still PENDING\u0027, () =\u003e pm.expect([200, 409]).to.include(pm.response.code));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "4 - Notifications",
+                     "description":  "Created asynchronously from RabbitMQ events.",
+                     "item":  [
+                                  {
+                                      "name":  "List my notifications",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const list = pm.response.json();",
+                                                                                    "pm.test(\u0027at least one notification (event arrived)\u0027, () =\u003e pm.expect(list.length).to.be.above(0));",
+                                                                                    "if (list.length) { pm.collectionVariables.set(\u0027notificationId\u0027, list[0].id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Mark the newest notification as read",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/{{notificationId}}/read"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027read is true\u0027, () =\u003e pm.expect(pm.response.json().read).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "5 - Responders",
+                     "description":  "Read-only catalogue (admin create/offline endpoints are not implemented).",
+                     "item":  [
+                                  {
+                                      "name":  "List all responders",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/responders"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u00279 seeded responders\u0027, () =\u003e pm.expect(pm.response.json().length).to.be.at.least(9));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "List AVAILABLE ambulances",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/responders?status=AVAILABLE\u0026type=AMBULANCE"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027all AMBULANCE and AVAILABLE\u0027, () =\u003e pm.response.json().forEach(r =\u003e { pm.expect(r.type).to.eql(\u0027AMBULANCE\u0027); pm.expect(r.status).to.eql(\u0027AVAILABLE\u0027); }));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Bad status filter (expect 400)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/responders?status=BANANA"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 400\u0027, () =\u003e pm.response.to.have.status(400));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "6 - Resilience demo",
+                     "description":  "Run these in order DURING the demo. Before request 1: kubectl -n resqnet scale deploy/responder-service --replicas=0 . Before request 3: kubectl -n resqnet scale deploy/responder-service --replicas=1 and wait until the pod is Ready (about 30 s). Not part of an automatic run (it needs kubectl).",
+                     "item":  [
+                                  {
+                                      "name":  "1. Report incident while responder-service is DOWN (expect PENDING)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents",
+                                                      "body":  {
+                                                                   "raw":  "{ \"type\": \"FIRE\", \"severity\": \"MEDIUM\", \"description\": \"Smoke from chemistry lab\", \"locationText\": \"Science Block\" }",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               },
+                                                                   "mode":  "raw"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const body = pm.response.json();",
+                                                                                    "pm.collectionVariables.set(\u0027pendingId\u0027, body.id);",
+                                                                                    "pm.test(\u0027still accepted: 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "pm.test(\u0027status is PENDING\u0027, () =\u003e pm.expect(body.status).to.eql(\u0027PENDING\u0027));",
+                                                                                    "pm.test(\u0027fast answer (under 3 s)\u0027, () =\u003e pm.expect(pm.response.responseTime).to.be.below(3000));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "2. List responders while DOWN (expect 503)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/responders"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 503\u0027, () =\u003e pm.response.to.have.status(503));",
+                                                                                    "pm.test(\u0027code is SERVICE_UNAVAILABLE\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027SERVICE_UNAVAILABLE\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "2b. Login and notifications still work",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "3. Admin: dispatch the pending incident after scaling back to 1 (expect ASSIGNED)",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/incidents/{{pendingId}}/dispatch",
+                                                      "auth":  {
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "type":  "string",
+                                                                                      "value":  "{{adminToken}}"
+                                                                                  }
+                                                                              ],
+                                                                   "type":  "bearer"
+                                                               }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027now ASSIGNED\u0027, () =\u003e pm.expect(pm.response.json().status).to.eql(\u0027ASSIGNED\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   },
+                                                        "listen":  "test"
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 }
+             ]
+}

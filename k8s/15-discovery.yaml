@@ -23,11 +23,11 @@ spec:
             - containerPort: 8761
           env:
             - name: JAVA_TOOL_OPTIONS
-              value: "-XX:MaxRAMPercentage=70"
+              value: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k"
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: 8761 }
             periodSeconds: 5
-            failureThreshold: 40
+            failureThreshold: 90
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: 8761 }
             periodSeconds: 10
@@ -38,7 +38,7 @@ spec:
             failureThreshold: 3
           resources:
             requests: { memory: 256Mi, cpu: 100m }
-            limits: { memory: 512Mi }
+            limits: { memory: 768Mi }
 ---
 apiVersion: v1
 kind: Service

@@ -17,7 +17,7 @@ The lab slide lists eight criteria. Honest status of each:
 | Criterion | What proves it | Status |
 |---|---|---|
 | **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`) | Done on the laptop's Minikube. **Not** reachable from a public/lab URL yet (only via `kubectl port-forward`). |
-| **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Partly.** Load balancing is verified (a 1,500-request run was split 50% / 50% over the two `incident-service` pods). But under 20 simultaneous users through `kubectl port-forward` the run was slow (4 requests/s, 81 timeouts) and all pods restarted once; the Java pods were using about 60% of their 512 Mi limit while idle. Needs higher memory limits and a re-run (see section 9). |
+| **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Done.** `scripts/load-test.ps1`: 20 simultaneous users, 1,500 requests, all HTTP 200, about 130-150 requests/second, average 134-153 ms, p95 about 270-295 ms, and `/api/incidents` shared exactly 50% / 50% by the two `incident-service` pods (two clean-cluster runs). |
 | **Database** | One PostgreSQL server, **four databases, four users**; a user cannot even connect to another service's database | Done and verified |
 | **Cross-service communication** | **Synchronous:** incident-service calls responder-service (REST). **Asynchronous:** incident-service publishes events to RabbitMQ, notification-service consumes them | Done and verified |
 | **Resilience** | Scale `responder-service` to 0: incidents are still accepted (`PENDING`), login and notifications still work | Done and verified in the cluster |
@@ -105,8 +105,8 @@ api-gateway/  auth-service/  incident-service/  responder-service/  notification
 k8s/                      Kubernetes manifests (namespace resqnet), applied in file-name order
 db/init-databases.sh      creates the 4 databases and 4 users (also embedded in k8s/02-config.yaml)
 docker-compose.yml        local Postgres (host port 5433) + RabbitMQ
-scripts/                  deploy-minikube.ps1, load-test.ps1
-docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, tracker
+scripts/                  deploy-minikube.ps1, smoke-test.ps1, demo-resilience.ps1, load-test.ps1, verify-references.ps1,`n                          generate-references.ps1, rehearsal.ps1 (all of them from a clean cluster), lib.ps1 (shared helpers)`npostman/                   ResQNet-Lite.postman_collection.json (28 requests, all with status-code tests)
+docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, tracker,`n                          viva/CODE_REFERENCES.md (generated file:line references), evidence/ (rehearsal logs)
 Documents/                original planning documents and prompts (kept as received)
 AGENTS.md                 conventions for AI coding agents working in this repo
 ```
@@ -231,7 +231,7 @@ cd <service>; mvn test        # use JDK 17; Docker must be running (Testcontaine
 
 Beyond unit tests, these were run against the real cluster: a 10-case security checklist (plus 9 extra checks), the resilience scenarios, pod-restart self-healing and persistence, RabbitMQ and notification outages, and the Eureka/load-balancing scenarios.
 
-Load test: `scripts/load-test.ps1` (see section 7). **Result of the first run (20 users x 25 rounds x 3 endpoints = 1,500 requests, through `kubectl port-forward`):** 1,419 returned 200 and 81 timed out after 30 s; 387 s total; requests to `/api/incidents` were shared exactly 50% / 50% by the two pods. During the run the cluster became unstable and every pod restarted once (kubelet restarts after failed probes; the kernel log also shows one Java process killed for exceeding its memory limit). After about two minutes all 9 pods were `1/1` again with data intact. This is **not yet a passing load test**: next steps are higher memory limits for the JVM pods (768 Mi), a lower heap share, and re-running the test (also from inside the cluster to rule out the port-forward tunnel as the bottleneck).
+Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on a freshly deployed cluster, through `kubectl port-forward`):** 20 users x 25 rounds x 3 endpoints = 1,500 requests, **all HTTP 200**; 10.3 s / 146 requests/s and 11.8 s / 127 requests/s; latency avg 134 / 153 ms, p95 271 / 295 ms, max 498 / 506 ms; `/api/incidents` answered 250 + 250 by the two incident pods. Full logs: `docs/evidence/`. An earlier attempt failed (81 timeouts, pods restarted) while Windows itself was out of memory (29.7 of 32.7 GB committed, heavy paging, so the Docker VM was starved); the manifests now use a lighter JVM (serial GC, C1 compiler, small stacks, 768 Mi limit) and a more patient startup probe (450 s), and the lab laptop should have other heavy applications closed during the demo.
 
 **Honest notes from testing:** while one pod of a service is being deleted and replaced, a few requests can receive 503 until the registry and the gateway's cache notice (seconds). Retrying idempotent GET requests at the gateway is a planned improvement.
 
