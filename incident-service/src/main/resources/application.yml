@@ -49,9 +49,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents
+        # metrics: request counters per pod (cluster-internal only; the gateway has no route to /actuator); circuit-breaker state and events
   endpoint:
     health:
+      show-components: always   # component NAMES and UP/DOWN only (db, rabbit ...); show-details stays off, so no connection data
       probes:
         enabled: true
       group:

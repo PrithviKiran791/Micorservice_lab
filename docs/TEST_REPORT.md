@@ -14,12 +14,12 @@ Raw logs are in [`docs/evidence/`](evidence/). "PASS" below means I ran the comm
 | Service | Tests | Result | What they cover |
 |---|---|---|---|
 | auth-service | 5 | PASS | duplicate username -> 409 `USERNAME_TAKEN`; registration always role `USER` and stores only the BCrypt hash; wrong password and unknown user give the same 401 `INVALID_CREDENTIALS`; login returns a Bearer token |
-| api-gateway | 21 | PASS | web UI route (added with the frontend): UI served without a token, SPA paths forwarded unchanged, `/api` still 401, unknown `/api` and `/internal` 404 and never sent to the UI, UI route is GET/HEAD only; missing, garbage, non-Bearer, expired, wrong-secret, wrong-issuer and unknown-role tokens are rejected with 401 and never forwarded; valid token forwarded with trusted `X-User-*`; forged headers replaced (also on public routes); login/register public, `/auth/me` not; short secret fails at start-up; **retry:** GET succeeds although one of two copies is dead, POST is never retried |
+| api-gateway | 30 | PASS | operations API (9): 401 without or with a bad/expired token, 403 for USER, DEGRADED / DOWN / UNKNOWN reported from fake Eureka and services, no secrets leaked, Kubernetes unavailable outside a cluster; web UI route (7): UI served without a token, SPA paths forwarded unchanged, `/api` still 401, unknown `/api` and `/internal` 404 and never sent to the UI, UI route is GET/HEAD only; missing, garbage, non-Bearer, expired, wrong-secret, wrong-issuer and unknown-role tokens are rejected with 401 and never forwarded; valid token forwarded with trusted `X-User-*`; forged headers replaced (also on public routes); login/register public, `/auth/me` not; short secret fails at start-up; **retry:** GET succeeds although one of two copies is dead, POST is never retried |
 | responder-service (real PostgreSQL via Testcontainers) | 4 | PASS | 10 simultaneous assignments for 3 ambulances give exactly 3 distinct responders and 7 refusals; assign is idempotent per incident; release is idempotent; release for another incident is refused |
 | incident-service (real PostgreSQL + real circuit breaker + fake responder server) | 19 | PASS | assigned; 409 -> `PENDING` without touching the breaker; connection refused, 3 s hang (read timeout) and HTTP 500 -> `PENDING` quickly; 3 failures open the breaker and no request reaches the responder while it is open; dispatch / resolve rules and 409s; resolve while responder is down -> 503 and state unchanged; USER 403 on admin endpoints; ownership and listing rules; 404; events: `incident.assigned`, `incident.pending`, unique `eventId`, broker failure never fails the request, failed dispatch publishes nothing |
 | notification-service (real PostgreSQL) | 9 | PASS | template texts; duplicate `eventId` creates one notification, also with 8 simultaneous copies; malformed events rejected without requeue; incident-service JSON (with its foreign `__TypeId__` header) is understood; own/all/`mine` listing; mark-read rules (403, 404) |
 | discovery-service | 0 | - | no application logic of its own (Eureka); verified through the cluster tests below |
-| **Total** | **58** | **PASS** | command: `.\scripts\run-unit-tests.ps1`, exit code 0 (logs: `docs/evidence/unit-tests-*.txt`) |
+| **Total** | **67** | **PASS** | command: `.\scripts\run-unit-tests.ps1`, exit code 0 (logs: `docs/evidence/unit-tests-*.txt`) |
 
 Test quality check: the responder concurrency test was run with the row lock removed from the SQL and **failed** ("responder handed out twice"); the gateway retry test was run with GET retry switched off and **failed** (503 instead of 200). Both locks were restored afterwards.
 
@@ -69,16 +69,26 @@ Test quality check: the responder concurrency test was run with the row lock rem
 
 # Part B - Script and documentation testing
 
-## A5. Web frontend (added 25 Nov 2026)
+## A5. Web frontend and operations command center (added 25 Nov 2026)
 
 | What | How | Result |
 |---|---|---|
-| Unit tests: statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards | `cd frontend; npm test` (Vitest) | 41 passed |
-| Type check and production build | `npm run typecheck; npm run build` | pass (main chunk about 122 kB gzip, charts loaded on demand) |
-| Gateway serves the UI and keeps its rules | `GatewayFrontendRouteTest` (real gateway, fake UI server) | 7 passed; all 21 gateway tests pass |
-| Docker image and Kubernetes | `docker build`, `minikube image load`, `kubectl apply -f k8s/40-frontend.yaml`, gateway restart; namespace not deleted | 11 pods Ready; `/`, `/app/incidents` (refresh), assets 200; `/api/incidents` without token 401; `/api/nothing` 404; `/internal/...` 404; POST `/` 404 |
-| Backend unchanged | `.\scripts\smoke-test.ps1` after the deployment | 37 passed, 0 failed |
-| Browser run on the live cluster | admin and a new reporter: login, role redirect, report, dispatch, resolve, notifications, analytics, settings, responder-service down (503 state, report stays PENDING), tampered token (session-ended notice), USER on `/app/admin` (redirected), phone width 375 px (drawer menu, no horizontal scroll) | all behaved as designed |
+| Unit tests: statistics, JWT expiry, validation, formatting, error mapping, token storage, route guards, role navigation, lab-evaluation status rules | `cd frontend; npm test` (Vitest) | 57 passed |
+| Type check and production build | `npm run typecheck; npm run build` (strict TypeScript) | pass |
+| Gateway tests incl. UI route and operations API | `.\scripts\run-unit-tests.ps1` | gateway 30 passed; all services 67 passed, 0 failed |
+| Docker image and Kubernetes (no namespace deletion) | `docker build`, `minikube image load`, `kubectl apply`, rollout restarts | 11 pods Ready; `/`, `/app/incidents` (refresh) and assets 200; `/api/incidents` without token 401; `/api/nothing` 404; `/internal/...` 404 |
+| Backend unchanged | `.\scripts\smoke-test.ps1` after the first UI deployment | 37 passed, 0 failed |
+| Operations API on the live cluster | `GET /api/ops/health | resilience | traffic | kubernetes` as ADMIN; no token 401 | all six services, Eureka, four databases, RabbitMQ, breaker per pod, request counters per pod and 9 deployments / 11 pods reported from live sources |
+| Live security demonstration (Security page) | 10 real requests through the gateway | 10 of 10 as expected: 401 x4, 404 (internal), 200 x2, 403 x3 (reporter token, also with a forged `X-User-Role: ADMIN`) |
+| Lab evaluation page | opened as ADMIN against the live cluster after generating traffic | 8 of 8 PASS, each with its stated basis (Testing: recorded results only) |
+| Resilience scenario on the live cluster | `kubectl scale deploy/responder-service --replicas=0`, 4 incidents reported, `--replicas=1`, admin dispatch | responder DOWN and `responder_db` UNKNOWN reported (not UP); 4 incidents stored as PENDING; after recovery UP again; 3 incidents ASSIGNED by dispatch, the 4th stayed PENDING (all 3 ambulances busy); see the finding below |
+| Role navigation and routing | browser as reporter and as ADMIN | reporter sees Overview, Report emergency, My incidents, Notifications, Profile; `/app/health` redirects to the overview; admin sees the 10 operations pages |
+| Mobile layout (375 px) | Service health, Architecture, Lab evaluation, Security, Operations overview | no horizontal page scroll on any of them; tables scroll inside their cards |
+| Incident detail via `GET /api/incidents/{id}` and responder detail via `GET /api/responders/{id}` | dialogs and deep link `?open=<id>` | detail loads the single incident; another user's incident shows "This incident is not yours" (403) |
+
+**Finding from the resilience run (not a defect of the dashboard):** with the responder pod stopped gracefully, Eureka removes it immediately, so the call fails at once with `IllegalArgumentException: Service Instance cannot be null`. That exception is not in the breaker's `record-exceptions`, so Resilience4j counts it as a success: the fallback ran (incidents became PENDING, log line `FALLBACK used`) but the circuit breaker stayed CLOSED. The breaker opens when the service is registered but not answering, which `IncidentFlowTest` covers. The dashboard shows the true state and explains this. Adding the exception to `record-exceptions` would make the breaker open here too; it was not changed because it alters existing resilience behaviour.
+
+**Observed once:** a rolling update of the UI pod returned one HTTP 503 from the gateway (pooled connection to the old pod). The UI route now retries GET like the API routes.
 
 ## B1. Scripts
 
@@ -117,7 +127,7 @@ Test quality check: the responder concurrency test was run with the row lock rem
 | Eureka dashboard and RabbitMQ UI **as seen in a browser** | checked by HTTP status and API only | open `http://localhost:8761` and `http://localhost:15672` after the port-forwards |
 | README option B (run locally without Kubernetes: `docker compose up -d` and `mvn spring-boot:run` per service, discovery-service first) | services were run locally earlier in the project, but not re-run in the final state with Eureka | follow section 6B of the README once |
 | Public link from **another device** ("Deployed" criterion) | the tunnel was tested from the same laptop (traffic went out to Cloudflare and back through the public `trycloudflare.com` name), not from a phone or another computer | run `.\scripts\start-public-url.ps1`, open the printed address on a phone using mobile data (not the same Wi-Fi), e.g. `<address>/actuator/health` |
-| Web UI in other browsers and on a real phone | only the built-in Chromium browser and its 375 px emulation were used; there are no automated end-to-end browser tests; the new CI job `frontend` has not run on GitHub yet | open the gateway address in your own browser and phone; push and read the Actions tab |
+| Web UI in other browsers and on a real phone | only the built-in Chromium browser and its 375 px emulation were used; there are no automated end-to-end browser tests (the GitHub Actions job `frontend` runs type check, unit tests and build and passed on the previous push) | open the gateway address in your own browser and phone |
 | Behaviour on a different machine | everything ran on one laptop | run `.\scripts\rehearsal.ps1 -Rebuild` on the evaluation machine beforehand |
 | Behaviour when Windows is short of memory | a failed run showed the cluster slows down badly; fixed by lighter settings but not guaranteed | close heavy applications before the demo |
 

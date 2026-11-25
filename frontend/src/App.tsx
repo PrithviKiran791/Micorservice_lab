@@ -17,6 +17,10 @@ const Responders = lazy(() => import('./pages/Responders'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const Settings = lazy(() => import('./pages/Settings'))
+const ServiceHealth = lazy(() => import('./pages/ServiceHealth'))
+const Architecture = lazy(() => import('./pages/Architecture'))
+const LabEvaluation = lazy(() => import('./pages/LabEvaluation'))
+const Security = lazy(() => import('./pages/Security'))
 
 /**
  * Routes:
@@ -60,6 +64,10 @@ function AppPages() {
       <Route path="overview" element={<Overview />} />
       <Route element={<RoleRoute role="ADMIN" />}>
         <Route path="admin" element={<AdminDashboard />} />
+        <Route path="health" element={<ServiceHealth />} />
+        <Route path="architecture" element={<Architecture />} />
+        <Route path="lab" element={<LabEvaluation />} />
+        <Route path="security" element={<Security />} />
       </Route>
       <Route path="report" element={<ReportEmergency />} />
       <Route path="incidents" element={<Incidents />} />

@@ -7,15 +7,19 @@ import { LiveStatus, PageHeader } from '../components/common/PageHeader'
 import { StatCard } from '../components/common/StatCard'
 import { EmptyState, ErrorState, InlineNotice, LoadingState } from '../components/common/States'
 import { ConfirmDialog } from '../components/common/Modal'
-import { IncidentDetail } from '../components/incidents/IncidentDetail'
+import { IncidentDetailLoader } from '../components/incidents/IncidentDetailLoader'
+import { HealthStrip } from '../components/ops/HealthPanels'
+import { SourceTag } from '../components/ops/StatusPill'
 import { IncidentTable } from '../components/incidents/IncidentTable'
 import { AvailabilitySummary } from '../components/responders/AvailabilitySummary'
 import { useToast } from '../contexts/ToastContext'
 import { useIncidentActions } from '../hooks/useIncidentActions'
 import { useResource } from '../hooks/useResource'
 import { incidentService } from '../services/incidentService'
+import { opsService } from '../services/opsService'
 import { responderService } from '../services/responderService'
 import type { Incident, Responder } from '../types/api'
+import type { OpsHealth } from '../types/ops'
 import { timeAgo } from '../utils/format'
 import { responderAvailability, summarize } from '../utils/stats'
 
@@ -23,8 +27,13 @@ import { responderAvailability, summarize } from '../utils/stats'
 export default function AdminDashboard() {
   const incidents = useResource<Incident[]>((signal) => incidentService.list(undefined, signal))
   const responders = useResource<Responder[]>((signal) => responderService.list(undefined, signal))
+  const ops = useResource<OpsHealth>((signal) => opsService.health(signal))
   const { notify } = useToast()
-  const { dialog, buttonsFor } = useIncidentActions(() => void incidents.reload())
+  const [refreshToken, setRefreshToken] = useState(0)
+  const { dialog, buttonsFor } = useIncidentActions(() => {
+    void incidents.reload()
+    setRefreshToken((n) => n + 1)
+  })
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [confirmAll, setConfirmAll] = useState(false)
@@ -38,8 +47,7 @@ export default function AdminDashboard() {
   // oldest first: the longest-waiting incident should be dispatched first
   const queue = useMemo(() => list.filter((i) => i.status === 'PENDING').sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()), [list])
   const recent = list.slice(0, 8)
-  const selected = selectedId !== null ? list.find((i) => i.id === selectedId) ?? null : null
-
+  
   const availability = responders.data ? responderAvailability(responders.data) : null
   const incidentById = useMemo(() => new Map(list.map((i) => [i.id, i])), [list])
   const busyResponders = (responders.data ?? []).filter((r) => r.status === 'BUSY')
@@ -70,7 +78,7 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <PageHeader title="Admin dashboard" subtitle="Incident queue, dispatch and responder availability." actions={<LiveStatus resource={incidents} />} />
+      <PageHeader title="Operations overview" subtitle="Incident queue, dispatch, responder availability and platform health." actions={<LiveStatus resource={incidents} />} />
 
       {responders.error && (
         <div className="mb-6">
@@ -86,13 +94,19 @@ export default function AdminDashboard() {
         <Card className="mb-6"><ErrorState error={incidents.error} onRetry={() => void incidents.reload()} title="Could not load incidents" /></Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <Card className="mb-6" title="Platform health" subtitle="Real health of every service, read by the gateway" actions={<><SourceTag kind="live" /><Link to="/app/health" className="text-sm font-medium text-brand hover:underline">Service health</Link></>}>
+        {ops.data ? <HealthStrip health={ops.data} /> : ops.error ? <p className="text-sm text-amber">Health could not be read: {ops.error.message}</p> : <p className="text-sm text-mute">Checking services...</p>}
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total incidents" value={v(summary.total)} icon={ClipboardList} />
         <StatCard label="Pending queue" value={v(summary.pending)} icon={Clock3} tone="amber" />
         <StatCard label="Assigned" value={v(summary.assigned)} icon={UserCheck} tone="ok" />
         <StatCard label="Resolved" value={v(summary.resolved)} icon={CheckCircle2} />
         <StatCard label="Critical, open" value={v(summary.openCritical)} icon={AlertOctagon} tone={summary.openCritical > 0 ? 'critical' : 'neutral'} />
-        <StatCard label="Responders free" value={availability ? `${availability.byStatus.AVAILABLE}/${availability.total}` : '-'} icon={Truck} tone="ok" hint={availability ? undefined : 'Unavailable'} />
+        <StatCard label="Total responders" value={availability ? availability.total : '-'} icon={Truck} hint={availability ? undefined : 'Unavailable, not zero'} />
+        <StatCard label="Available responders" value={availability ? availability.byStatus.AVAILABLE : '-'} icon={UserCheck} tone="ok" hint={availability ? undefined : 'Unavailable, not zero'} />
+        <StatCard label="Busy responders" value={availability ? availability.byStatus.BUSY : '-'} icon={Truck} tone="amber" hint={availability ? undefined : 'Unavailable, not zero'} />
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[2fr_1fr]">
@@ -166,7 +180,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {selected && <IncidentDetail incident={selected} onClose={() => setSelectedId(null)} footer={buttonsFor(selected)} />}
+      {selectedId !== null && <IncidentDetailLoader key={selectedId} id={selectedId} fallback={list.find((i) => i.id === selectedId)} onClose={() => setSelectedId(null)} refreshToken={refreshToken} footer={buttonsFor} />}
       {dialog}
       {confirmAll && (
         <ConfirmDialog

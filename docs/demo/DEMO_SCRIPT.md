@@ -74,3 +74,13 @@ Only if the evaluation asks for a URL "not just localhost". It is a temporary tu
 | `ErrImagePull` / `ImagePullBackOff` | Images are not in Minikube: run `.\scripts\deploy-minikube.ps1` (without `-SkipImages`). |
 | Port 8080 already in use | Stop the other program, or use `kubectl ... port-forward svc/api-gateway 8081:8080` and set `$b = "http://localhost:8081"`. |
 | You want a clean start | `kubectl delete ns resqnet` then `.\scripts\deploy-minikube.ps1 -SkipBuild -SkipImages` |
+
+## Optional: the same demo in the browser (2 minutes)
+
+Open the gateway address (`kubectl -n resqnet port-forward svc/api-gateway 8080:8080`, then `http://localhost:8080`) and sign in as `admin`.
+
+1. **Service health:** every service, Eureka registrations, both incident pods, the four databases, RabbitMQ and the Kubernetes deployments, all read live.
+2. **Architecture:** click Incident Service to show its connections (REST to the responder, RabbitMQ event to the notification service).
+3. **Security:** press "Run basic checks" and "Run reporter checks": 401, 403 and 404 from the real gateway.
+4. **Lab evaluation:** the eight criteria with their evidence and live checks; run `.\scripts\load-test.ps1` first so the load-balancing check has traffic to count.
+5. For the resilience part keep **Service health > Resilience** open while you run the two `kubectl scale` commands from `docs/LAB_EVALUATION.md`.

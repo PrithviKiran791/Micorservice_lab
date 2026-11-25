@@ -1,30 +1,41 @@
-import { BarChart3, Bell, ClipboardList, LayoutDashboard, Settings, ShieldCheck, Siren, Truck, type LucideIcon } from 'lucide-react'
+import { Activity, BarChart3, Bell, ClipboardCheck, ClipboardList, LayoutDashboard, Lock, Network, Settings, ShieldCheck, Siren, Truck, UserCircle, type LucideIcon } from 'lucide-react'
 import type { Role } from '../../types/api'
 
 export interface NavItem {
   to: string
   label: string
   icon: LucideIcon
-  /** If set, only this role sees the item (the backend still enforces the permission itself). */
-  role?: Role
+  /** Only these roles see the item (the backend still enforces the permission itself). */
+  roles: Role[]
+  /** Different wording for a role, for example "My incidents" for a reporter. */
+  labelFor?: Partial<Record<Role, string>>
   /** Shows the unread-notification counter next to the label. */
   badge?: 'unread'
 }
 
-/** The sidebar. Administrator items are hidden from regular users; reporter-only items are hidden from administrators. */
+/**
+ * The sidebar. The reporter portal stays small; the administrator gets the operations command center.
+ * Hiding an item is only a convenience: the API gateway and the services enforce the real permissions.
+ */
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/app/overview', label: 'Overview', icon: LayoutDashboard, role: 'USER' },
-  { to: '/app/admin', label: 'Admin dashboard', icon: ShieldCheck, role: 'ADMIN' },
-  { to: '/app/report', label: 'Report emergency', icon: Siren },
-  { to: '/app/incidents', label: 'Incidents', icon: ClipboardList },
-  { to: '/app/responders', label: 'Responders', icon: Truck },
-  { to: '/app/notifications', label: 'Notifications', icon: Bell, badge: 'unread' },
-  { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/app/settings', label: 'Settings', icon: Settings },
+  { to: '/app/overview', label: 'Overview', icon: LayoutDashboard, roles: ['USER'] },
+  { to: '/app/admin', label: 'Operations overview', icon: ShieldCheck, roles: ['ADMIN'] },
+  { to: '/app/report', label: 'Report emergency', icon: Siren, roles: ['USER'] },
+  { to: '/app/incidents', label: 'Incidents', icon: ClipboardList, roles: ['USER', 'ADMIN'], labelFor: { USER: 'My incidents' } },
+  { to: '/app/responders', label: 'Responders', icon: Truck, roles: ['ADMIN'] },
+  { to: '/app/notifications', label: 'Notifications', icon: Bell, roles: ['USER', 'ADMIN'], badge: 'unread' },
+  { to: '/app/analytics', label: 'Analytics', icon: BarChart3, roles: ['ADMIN'] },
+  { to: '/app/health', label: 'Service health', icon: Activity, roles: ['ADMIN'] },
+  { to: '/app/architecture', label: 'Architecture', icon: Network, roles: ['ADMIN'] },
+  { to: '/app/lab', label: 'Lab evaluation', icon: ClipboardCheck, roles: ['ADMIN'] },
+  { to: '/app/security', label: 'Security', icon: Lock, roles: ['ADMIN'] },
+  { to: '/app/settings', label: 'Settings', icon: Settings, roles: ['ADMIN'] },
+  { to: '/app/settings', label: 'Profile', icon: UserCircle, roles: ['USER'] },
 ]
 
 export function navFor(role: Role | undefined): NavItem[] {
-  return NAV_ITEMS.filter((item) => !item.role || item.role === role)
+  if (!role) return []
+  return NAV_ITEMS.filter((item) => item.roles.includes(role)).map((item) => ({ ...item, label: item.labelFor?.[role] ?? item.label }))
 }
 
 /** Where a user lands after signing in. */

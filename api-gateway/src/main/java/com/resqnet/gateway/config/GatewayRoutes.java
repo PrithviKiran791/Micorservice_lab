@@ -56,7 +56,7 @@ public class GatewayRoutes {
                 .route(FRONTEND_ROUTE_ID, r -> r.order(Ordered.LOWEST_PRECEDENCE)
                         .method(HttpMethod.GET, HttpMethod.HEAD)
                         .and().not(n -> n.path("/api/**", "/internal/**", "/actuator/**"))
-                        .filters(f -> f.setRequestHeader("X-Gateway-Prefix", "/"))
+                        .filters(f -> retryGets(f.setRequestHeader("X-Gateway-Prefix", "/")))   // a UI pod being replaced must not show an error page
                         .uri(frontendUrl))
                 .route("auth", r -> r.path("/api/auth/**")
                         .filters(this::standardFilters).uri("lb://auth-service"))
@@ -71,8 +71,12 @@ public class GatewayRoutes {
 
     /** Filters shared by every route: strip "/api", tell the service about it, retry failed GETs. */
     private GatewayFilterSpec standardFilters(GatewayFilterSpec f) {
-        return f.stripPrefix(1)
-                .setRequestHeader("X-Gateway-Prefix", "/api")
+        return retryGets(f.stripPrefix(1).setRequestHeader("X-Gateway-Prefix", "/api"));
+    }
+
+    /** Retry policy for idempotent GET requests (see the class comment). */
+    private GatewayFilterSpec retryGets(GatewayFilterSpec f) {
+        return f
                 .retry(retry -> retry
                         .setRetries(2)                                        // 1 original try + up to 2 retries
                         .setMethods(HttpMethod.GET)                           // idempotent requests only

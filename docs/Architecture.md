@@ -171,7 +171,8 @@ Namespace `resqnet`. One manifest file per concern in `k8s/`:
 | `11-rabbitmq.yaml` | RabbitMQ Deployment + Service `rabbitmq` (5672, 15672) |
 | `15-discovery.yaml` | discovery-service (Eureka) Deployment + Service (8761) |
 | `20-auth.yaml` ... `23-notification.yaml` | Deployment + ClusterIP Service per service |
-| `30-gateway.yaml` | Deployment + Service (NodePort 30080) |
+| `30-gateway.yaml` | Deployment (2 replicas, ServiceAccount `api-gateway`) + Service (NodePort 30080) |
+| `31-gateway-rbac.yaml` | ServiceAccount + Role + RoleBinding: the gateway may only `get`/`list` deployments, pods and services in `resqnet` (for `GET /api/ops/kubernetes`); no secrets, no writes |
 | `40-frontend.yaml` | web UI: Deployment (nginx) + ClusterIP Service `frontend`; the gateway routes every non-API GET to it (see docs/FRONTEND.md) |
 
 Per workload: image `resqnet/<service>:1.0` (`imagePullPolicy: IfNotPresent`), environment from
@@ -199,7 +200,11 @@ Access from Windows: `kubectl -n resqnet port-forward svc/api-gateway 8080:8080`
 
 ## 12. Observability
 
-Actuator `health` and `info` endpoints only. Logs to stdout (`kubectl logs`). Log lines for dispatch include
+Each service exposes actuator `health` (component names and UP/DOWN only, `show-details` stays off) and `info`, plus `metrics` (all four business services) and the Resilience4j `circuitbreakers` / `circuitbreakerevents` (incident-service). These are reachable only inside the cluster: the gateway has no route to `/actuator` of the services.
+
+The administrator command center is fed by the **operations API**, `GET /api/ops/health | resilience | traffic | kubernetes` (see `API_CONTRACT.md` section 11). It lives in the api-gateway (package `com.resqnet.gateway.ops`) because the gateway already verifies the JWT, is a Eureka client and is the only public entry point; no new service and no monitoring stack was added. It reads the Eureka registry, probes every registered instance, and reads the Kubernetes API with a read-only ServiceAccount. It never changes any state, and an unreadable source is reported as unknown instead of guessed. Which numbers are live, calculated or recorded evidence is explained in `docs/FRONTEND.md`.
+
+Logs to stdout (`kubectl logs`). Log lines for dispatch include
 `incidentId`, result, and whether the fallback was used. RabbitMQ management UI (15672) can be port-forwarded to show the queue.
 
 ## 13. Architecture decisions

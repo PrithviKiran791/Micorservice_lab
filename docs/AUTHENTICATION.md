@@ -105,6 +105,7 @@ Failures return 403 with code `FORBIDDEN`.
 | PATCH /api/responders/{id}/status | | 403 | yes |
 | GET /api/notifications | | own only | all |
 | PATCH /api/notifications/{id}/read | | owner only | yes |
+| GET /api/ops/health, /resilience, /traffic, /kubernetes | | 403 | yes (answered by the gateway itself, see API_CONTRACT section 11) |
 
 Internal endpoints (`/internal/**`) carry no user identity and are protected by network isolation (ClusterIP, not routed).
 

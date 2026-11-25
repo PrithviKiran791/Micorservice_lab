@@ -5,6 +5,8 @@ A user reports an emergency (medical, fire, police). The system saves it, asks a
 responder of the right type, assigns one, and records a notification. If the responder service is down, the
 incident is **still accepted** as `PENDING` and can be dispatched later.
 
+A **React web interface** (served through the same gateway) gives reporters a simple portal and gives the dispatcher an **operations command center** that shows the real health of every service, Eureka, the databases, RabbitMQ, the circuit breaker and the Kubernetes deployment, plus a **Lab evaluation** page for the eight lab criteria (section 7c).
+
 Everything runs as pods on **Minikube** (Kubernetes) behind a single **API Gateway** that checks a **JWT** on every request.
 This is a simulation: no real emergency services or personal data are involved. Total cost: Rs 0 (all free, open-source tools).
 
@@ -23,7 +25,7 @@ The lab slide lists eight criteria. Honest status of each:
 | **Resilience** | Scale `responder-service` to 0: incidents are still accepted (`PENDING`), login and notifications still work | Done and verified in the cluster |
 | **Service discovery and gateway** | **Eureka** registry + one **Spring Cloud Gateway** entry point routing by service name (`lb://...`) | Done and verified in the cluster |
 | **Security** | JWT checked **at the gateway**; 401 without a valid token, 403 for a USER on admin endpoints | Done and verified (19 checks) |
-| **Testing** | JUnit tests in every service | **Done.** 51 automated JUnit tests pass (`scripts/run-unit-tests.ps1`), plus scripts and Postman; every result is in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) (application tests and script/document tests kept separate). |
+| **Testing** | JUnit tests in every service | **Done.** 67 automated JUnit tests pass (`scripts/run-unit-tests.ps1`), plus scripts and Postman; every result is in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) (application tests and script/document tests kept separate). |
 
 ---
 
@@ -109,7 +111,7 @@ k8s/                      Kubernetes manifests (namespace resqnet), applied in f
 db/init-databases.sh      creates the 4 databases and 4 users (also embedded in k8s/02-config.yaml)
 docker-compose.yml        local Postgres (host port 5433) + RabbitMQ
 scripts/                  deploy-minikube.ps1, smoke-test.ps1, demo-resilience.ps1, demo-failover.ps1, load-test.ps1, verify-references.ps1,`n                          generate-references.ps1, rehearsal.ps1 (all of them from a clean cluster), lib.ps1 (shared helpers)`npostman/                   ResQNet-Lite.postman_collection.json (28 requests, all with status-code tests)
-docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, tracker,`n                          viva/CODE_REFERENCES.md (generated file:line references), evidence/ (rehearsal logs)
+docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, FRONTEND, INTEGRATION_AUDIT, LAB_EVALUATION, tracker,`n                          viva/CODE_REFERENCES.md (generated file:line references), evidence/ (rehearsal logs)
 Documents/                original planning documents and prompts (kept as received)
 AGENTS.md                 conventions for AI coding agents working in this repo
 ```
@@ -221,12 +223,31 @@ Open the gateway address in a browser (`kubectl -n resqnet port-forward svc/api-
 
 ---
 
+## 7c. Operations command center (administrators)
+
+Signed in as the dispatcher (`admin`), the sidebar becomes a command center. It reads **live** state through four read-only, admin-only endpoints that the gateway answers itself (`GET /api/ops/health | resilience | traffic | kubernetes`; contract in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) section 11):
+
+| Page | What it shows | Real source |
+|---|---|---|
+| **Operations overview** | incident and responder counters (unavailable shows "-", never 0), platform health strip, pending queue, dispatch | incident and responder APIs, `/api/ops/health` |
+| **Service health** | health of every pod of the six services, Eureka registrations, replica counts and request distribution over the two incident pods, the four databases, RabbitMQ, circuit breaker with the seven-step failure scenario, Kubernetes deployments and pods | Eureka, each pod's `/actuator`, the Kubernetes API (read-only ServiceAccount) |
+| **Architecture** | interactive diagram of the real system with four line styles (REST, RabbitMQ events, discovery, database); click a component for responsibility, endpoints, connections and live state | design data plus live health |
+| **Lab evaluation** | the eight lab criteria, each with implementation, live checks, recorded evidence and a PASS / PARTIAL / NOT VERIFIED status that cannot pass on a source file alone; four demo workflows | live checks plus `docs/evidence` |
+| **Security** | your session, role matrix, and a live demonstration: 10 real requests showing 401, 403 and 404 | the real gateway |
+
+Every number is tagged **Live**, **Calculated**, **Recorded evidence**, **Design** or **Unavailable**, so measured values are never confused with recorded results. There is deliberately no browser button that stops a service or starts a load test: the demo workflows show the `kubectl` / PowerShell commands instead. Details: [`docs/FRONTEND.md`](docs/FRONTEND.md), [`docs/LAB_EVALUATION.md`](docs/LAB_EVALUATION.md), [`docs/INTEGRATION_AUDIT.md`](docs/INTEGRATION_AUDIT.md).
+
+**A finding worth knowing for the viva:** when the responder pod is stopped gracefully, Eureka removes it at once, so the call fails immediately (no instance), the fallback stores the incident as `PENDING`, but the circuit breaker **stays CLOSED**, because that exception is not in the breaker's `record-exceptions` and Resilience4j counts it as a success. The breaker opens when the service is registered but not answering (crash, timeout, HTTP 5xx). The dashboard shows this honestly.
+
+---
+
 ## 8. Security model
 
 - Passwords are stored as **BCrypt** hashes; public registration always creates role `USER`.
 - The **gateway is the only place a JWT is verified** (HS256 signature, issuer, expiry). Services read the verified identity from `X-User-*` headers and apply role rules; they never parse tokens.
 - The gateway **removes client-sent `X-User-*` headers** (a forged `X-User-Role: ADMIN` is ignored).
 - Only `api-gateway` is exposed (NodePort); every other Service is `ClusterIP`. `/internal/**` is never routed (404).
+- The operations API (`/api/ops/*`) is answered by the gateway and checks the JWT itself: 401 without a token, 403 for a USER. The gateway reads the cluster with a **read-only** ServiceAccount (`k8s/31-gateway-rbac.yaml`: get/list deployments, pods, services in `resqnet`; no secrets, no writes). The services' actuator endpoints (health components, metrics, circuit breakers) are reachable only inside the cluster.
 - **Demo secrets:** `k8s/01-secrets.yaml` and the `application-local.yml` files contain clearly labelled demo values for the lab. Never reuse them for anything real.
 
 Known limits: no refresh tokens or revocation, no HTTPS inside the cluster, no rate limiting, symmetric JWT key shared by auth-service and gateway.
@@ -242,9 +263,10 @@ cd <service>; mvn test        # use JDK 17; Docker must be running (Testcontaine
 | Service | Tests | What they cover |
 |---|---|---|
 | auth-service | 5 | duplicate username 409, wrong password 401, registration always USER |
-| api-gateway | 14 | missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, valid accepted, forged headers replaced; GET retried on a healthy copy, POST never retried |
+| api-gateway | 30 | JWT rules (missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, forged headers replaced); GET retried on a healthy copy, POST never retried; web UI route; **operations API**: 401 / 403, DEGRADED / DOWN / UNKNOWN reported from fake Eureka, services and Kubernetes, no secrets leaked |
 | responder-service | 4 | 10 concurrent assignments for 3 ambulances give exactly 3 distinct responders (verified to fail if the row lock is removed); idempotent assign; release rules |
 | incident-service | 19 | fallback to `PENDING` on 409 / connection refused / 3 s hang / HTTP 500, breaker opens, dispatch/resolve rules, access rules, events published |
+| frontend (Vitest) | 57 | statistics, JWT expiry, validation, error mapping, token storage, route guards, role navigation, lab-evaluation status rules (`cd frontend; npm test`) |
 | notification-service | 9 | duplicate `eventId` creates one notification (also with 8 simultaneous copies), malformed events rejected, templates, access rules |
 
 Beyond unit tests, these were run against the real cluster: a 10-case security checklist (plus 9 extra checks), the resilience scenarios, pod-restart self-healing and persistence, RabbitMQ and notification outages, and the Eureka/load-balancing scenarios.
@@ -264,7 +286,9 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | endpoints, payloads, status codes, events (highest authority) |
 | [`docs/schema.md`](docs/schema.md) | tables, enums, state machines |
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
-| [`docs/FRONTEND.md`](docs/FRONTEND.md) | web UI: pages and roles, how it is served by the gateway, API usage, gaps, local run, Docker/Kubernetes, tests |
+| [`docs/INTEGRATION_AUDIT.md`](docs/INTEGRATION_AUDIT.md) | frontend-to-backend audit: dependency diagram, integration matrix, observability gaps and how they were closed |
+| [`docs/LAB_EVALUATION.md`](docs/LAB_EVALUATION.md) | the eight lab criteria with implementation, live checks, evidence, demo steps, and what was observed in the resilience run |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | web UI and command center: pages and roles, where every number comes from, the operations API, gaps, local run, Docker/Kubernetes, tests |
 | [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
 | [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
 | [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 36 likely questions with answers |
@@ -293,9 +317,11 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
 | `scripts/start-public-url.ps1` | temporary public HTTPS link (Cloudflare quick tunnel) to the gateway on the laptop; `-Check` runs the smoke test through it |
-| `scripts/run-unit-tests.ps1` | all 58 JUnit tests with a summary table |
+| `scripts/run-unit-tests.ps1` | all 67 JUnit tests with a summary table |
 | `scripts/verify-docs.ps1` | checks that every file, link, script option, class.method and Kubernetes name mentioned in the documents exists |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
+
+The web UI and command center (sections 7b and 7c) were verified against the live cluster: unit tests (frontend 57, JUnit 67), the final smoke test (37/37), the resilience demo (16/16), the failover demo (7/7) and the Security page (10/10 live checks). The demo scripts need free responders of the type they report (fire trucks, ambulances): leftover open incidents can make step 1 report PENDING.
 
 Still to do (tracked in `docs/tracker.md`):
 - the optional admin endpoints for responders (create, set OFFLINE) were not built

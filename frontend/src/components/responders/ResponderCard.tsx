@@ -7,7 +7,7 @@ import { RESPONDER_TYPE_LABEL } from '../../utils/format'
  * One responder. "Current assignment" is the id of the incident it is handling, which is all the backend exposes;
  * when the caller also knows the incident (a dispatcher sees every incident) its description is shown too.
  */
-export function ResponderCard({ responder, incident }: { responder: Responder; incident?: Incident }) {
+export function ResponderCard({ responder, incident, onSelect }: { responder: Responder; incident?: Incident; onSelect?: () => void }) {
   const Icon = RESPONDER_TYPE_ICON[responder.type]
   const busy = responder.status === 'BUSY'
   return (
@@ -24,6 +24,11 @@ export function ResponderCard({ responder, incident }: { responder: Responder; i
         </div>
         <ResponderStatusBadge status={responder.status} />
       </div>
+      {onSelect && (
+        <button type="button" onClick={onSelect} className="mt-3 text-xs font-medium text-brand hover:underline">
+          View details
+        </button>
+      )}
 
       <div className="mt-4 border-t border-line pt-3 text-sm">
         {responder.currentIncidentId !== null ? (

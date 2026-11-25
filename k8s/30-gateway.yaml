@@ -14,6 +14,7 @@ spec:
       labels:
         app: api-gateway
     spec:
+      serviceAccountName: api-gateway    # read-only access to this namespace for GET /api/ops/kubernetes (k8s/31-gateway-rbac.yaml)
       containers:
         - name: api-gateway
           image: resqnet/api-gateway:1.0

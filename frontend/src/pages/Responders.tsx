@@ -7,6 +7,7 @@ import { StatCard } from '../components/common/StatCard'
 import { EmptyState, ErrorState, InlineNotice, LoadingState } from '../components/common/States'
 import { AvailabilitySummary } from '../components/responders/AvailabilitySummary'
 import { ResponderCard } from '../components/responders/ResponderCard'
+import { ResponderDetail } from '../components/responders/ResponderDetail'
 import { useAuth } from '../contexts/AuthContext'
 import { useResource } from '../hooks/useResource'
 import { incidentService } from '../services/incidentService'
@@ -23,6 +24,7 @@ export default function Responders() {
   const incidents = useResource<Incident[]>((signal) => incidentService.list(undefined, signal), { enabled: isAdmin })
   const [type, setType] = useState<ResponderType | ''>('')
   const [status, setStatus] = useState<ResponderStatus | ''>('')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const list = responders.data ?? []
   const incidentById = useMemo(() => new Map((incidents.data ?? []).map((i) => [i.id, i])), [incidents.data])
@@ -83,7 +85,7 @@ export default function Responders() {
               ) : (
                 <ul className="grid gap-3 sm:grid-cols-2">
                   {filtered.map((r) => (
-                    <ResponderCard key={r.id} responder={r} incident={r.currentIncidentId !== null ? incidentById.get(r.currentIncidentId) : undefined} />
+                    <ResponderCard key={r.id} responder={r} onSelect={() => setSelectedId(r.id)} incident={r.currentIncidentId !== null ? incidentById.get(r.currentIncidentId) : undefined} />
                   ))}
                 </ul>
               )}
@@ -96,6 +98,7 @@ export default function Responders() {
           </p>
         </>
       )}
+      {selectedId !== null && <ResponderDetail key={selectedId} id={selectedId} fallback={list.find((r) => r.id === selectedId)} onClose={() => setSelectedId(null)} />}
     </>
   )
 }

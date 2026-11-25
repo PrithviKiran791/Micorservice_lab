@@ -5,7 +5,7 @@ import { Card } from '../components/common/Card'
 import { SelectInput, TextInput } from '../components/common/FormField'
 import { LiveStatus, PageHeader } from '../components/common/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '../components/common/States'
-import { IncidentDetail } from '../components/incidents/IncidentDetail'
+import { IncidentDetailLoader } from '../components/incidents/IncidentDetailLoader'
 import { IncidentTable } from '../components/incidents/IncidentTable'
 import { useAuth } from '../contexts/AuthContext'
 import { useIncidentActions } from '../hooks/useIncidentActions'
@@ -21,7 +21,11 @@ import { INCIDENT_TYPE_LABEL, SEVERITY_LABEL, STATUS_LABEL } from '../utils/form
 export default function Incidents() {
   const { isAdmin } = useAuth()
   const incidents = useResource<Incident[]>((signal) => incidentService.list(undefined, signal))
-  const { dialog, buttonsFor } = useIncidentActions(() => void incidents.reload())
+  const [refreshToken, setRefreshToken] = useState(0)
+  const { dialog, buttonsFor } = useIncidentActions(() => {
+    void incidents.reload()
+    setRefreshToken((n) => n + 1)   // the open dialog fetches its incident again
+  })
 
   const [params, setParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -48,7 +52,7 @@ export default function Incidents() {
     )
   }, [list, query, status, type, severity])
 
-  // always show the freshest copy of the selected incident (the list is polled)
+  // the list copy is only a placeholder; the dialog loads the incident itself (GET /api/incidents/{id})
   const selected = selectedId !== null ? list.find((i) => i.id === selectedId) ?? null : null
   const closeDetail = () => {
     setSelectedId(null)
@@ -113,7 +117,9 @@ export default function Incidents() {
         )}
       </Card>
 
-      {selected && <IncidentDetail incident={selected} onClose={closeDetail} footer={isAdmin ? buttonsFor(selected) : undefined} />}
+      {selectedId !== null && (
+        <IncidentDetailLoader key={selectedId} id={selectedId} fallback={selected} onClose={closeDetail} refreshToken={refreshToken} footer={isAdmin ? buttonsFor : undefined} />
+      )}
       {dialog}
     </>
   )

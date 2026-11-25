@@ -47,12 +47,12 @@ Every row gives the file, the exact line number and the code snippet found there
 | Concept | File:line | Snippet | Class / method | Rubric row |
 |---|---|---|---|---|
 | The registry (Eureka server) | `discovery-service/src/main/java/com/resqnet/discovery/DiscoveryServiceApplication.java:12` | `@EnableEurekaServer` | DiscoveryServiceApplication | Service discovery |
-| Failed GET requests are retried on another copy (smooth failover) | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:78` | `.setMethods(HttpMethod.GET)` | GatewayRoutes.standardFilters | Handles traffic, Resilience |
+| Failed GET requests are retried on another copy (smooth failover) | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:82` | `.setMethods(HttpMethod.GET)` | GatewayRoutes.standardFilters | Handles traffic, Resilience |
 | Test: GETs succeed although one copy is dead; POSTs are never repeated | `api-gateway/src/test/java/com/resqnet/gateway/config/GatewayRetryTest.java:75` | `void getRequestsSucceedEvenThoughOneCopyIsDead()` | GatewayRetryTest | Testing |
 | Gateway gives up on a dead copy after 1 s | `api-gateway/src/main/resources/application.yml:40` | `connect-timeout: 1000` | application.yml (httpclient) | Resilience |
 | Gateway routes by service NAME, not address | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:64` | `.uri("lb://incident-service"))` | GatewayRoutes.routes | Service discovery, Handles traffic |
 | incident-service finds responder-service by name | `incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:13` | `@LoadBalanced` | RestClientConfig.loadBalancedRestClientBuilder | Service discovery |
-| Every service registers with Eureka | `incident-service/src/main/resources/application.yml:66` | `defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}` | application.yml (eureka.client) | Service discovery |
+| Every service registers with Eureka | `incident-service/src/main/resources/application.yml:68` | `defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}` | application.yml (eureka.client) | Service discovery |
 | Two copies of incident-service | `k8s/21-incident.yaml:8` | `replicas: 2` | Deployment incident-service | Handles traffic |
 | Which pod answered (load-balancing evidence) | `incident-service/src/main/java/com/resqnet/incident/config/ServedByFilter.java:26` | `response.setHeader("X-Served-By", instanceName);` | ServedByFilter.doFilterInternal | Handles traffic |
 
@@ -81,5 +81,5 @@ Every row gives the file, the exact line number and the code snippet found there
 | Image: Java runtime plus the jar | `auth-service/Dockerfile:2` | `FROM eclipse-temurin:17-jre` | Dockerfile | Deployed |
 | Wait for Postgres before starting (init container) | `k8s/22-responder.yaml:19` | `name: wait-for-postgres` | Deployment responder-service | Deployed |
 | Readiness probe: only receive traffic when healthy | `k8s/22-responder.yaml:51` | `readinessProbe:` | Deployment responder-service | Deployed |
-| Only the gateway is reachable from outside | `k8s/30-gateway.yaml:57` | `type: NodePort` | Service api-gateway | Deployed, Security |
+| Only the gateway is reachable from outside | `k8s/30-gateway.yaml:58` | `type: NodePort` | Service api-gateway | Deployed, Security |
 | Images are copied into Minikube (containerd runtime) | `scripts/deploy-minikube.ps1:77` | `minikube image load $image` | deploy-minikube.ps1 | Deployed |

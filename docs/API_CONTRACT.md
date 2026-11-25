@@ -312,3 +312,43 @@ on malformed message, log and reject without requeue (stretch: dead-letter queue
 | GET /api/notifications | | own only | all |
 | PATCH /api/notifications/{id}/read | | own only | yes |
 | GET /actuator/health (gateway) | yes | yes | yes |
+| GET /api/ops/health, /resilience, /traffic, /kubernetes | | no (403) | yes |
+
+## 11. Operations API (administrator only, added for the operations command center)
+
+Read-only observability endpoints, **answered by the API gateway itself** (they are not routed to any service, so the routing filter does not run; each handler verifies the JWT with the same secret, issuer and expiry rules). They exist because the browser must not talk to Eureka, the services' actuator endpoints, PostgreSQL, RabbitMQ or Kubernetes. Existing endpoints and contracts above are unchanged.
+
+| Method and path | Auth | Answer |
+|---|---|---|
+| `GET /api/ops/health` | ADMIN | health of every instance, Eureka registry, databases, RabbitMQ |
+| `GET /api/ops/resilience` | ADMIN | circuit-breaker state and recent events of every incident-service instance |
+| `GET /api/ops/traffic` | ADMIN | request counters per pod (since the pod started) |
+| `GET /api/ops/kubernetes` | ADMIN | deployments, replica counts, pods and service exposure of the namespace `resqnet` |
+
+Errors: no or bad token `401 UNAUTHORIZED`, valid token without ADMIN `403 FORBIDDEN` (standard error body, section 2). Responses carry `Cache-Control: no-store`.
+
+Sources (all live, nothing cached or invented): the Eureka REST registry (`/eureka/apps`), `GET /actuator/health` (component names and UP/DOWN only, `show-details` stays `never`), `/actuator/circuitbreakers`, `/actuator/circuitbreakerevents`, `/actuator/metrics/http.server.requests` of each registered instance, and the Kubernetes API read with the gateway's own read-only ServiceAccount (`k8s/31-gateway-rbac.yaml`: `get`/`list` on deployments, pods and services in `resqnet`, nothing else). The actuator endpoints are reachable only inside the cluster; the gateway has no route to them. Unreadable sources are reported (`UNKNOWN`, `UNREACHABLE`, `"available": false`) and never guessed.
+
+`GET /api/ops/health` (shape, values abbreviated):
+
+```json
+{
+  "generatedAt": "2026-11-25T13:20:00Z",
+  "discovery": { "health": "UP", "registryReadable": true, "responseMs": 45,
+                 "registeredApplications": [{ "name": "incident-service", "instances": 2, "up": 2 }] },
+  "services": [{ "name": "incident-service", "status": "UP", "registeredInstances": 2, "healthyInstances": 2,
+                 "lastHealthyAt": "2026-11-25T13:20:00Z",
+                 "instances": [{ "instanceId": "...", "address": "10.244.0.142:8082", "eurekaStatus": "UP",
+                                 "health": "UP", "responseMs": 382, "components": { "db": "UP", "rabbit": "UP" } }] }],
+  "databases": [{ "service": "incident-service", "database": "incident_db", "status": "UP" }],
+  "rabbitmq": { "status": "UP", "reportedBy": [{ "service": "incident-service", "role": "publishes incident events", "status": "UP" }] }
+}
+```
+
+Service `status`: `UP` (all registered instances healthy), `DEGRADED` (some), `DOWN` (none healthy, or none registered), `UNKNOWN` (the registry could not be read). A database or the broker is `UP` if any reporting instance says so, `DOWN` if instances report it but none is UP, `UNKNOWN` if nobody reports it (for example because its service is down).
+
+`GET /api/ops/resilience`: `{ "instances": [{ "instanceId", "available", "circuitBreakers": { "responderService": { "state", "failureRate", "bufferedCalls", "failedCalls", "notPermittedCalls", ... } }, "events": [{ "type", "stateTransition", "time", "errorMessage" }] }] }` (newest event first, at most 15).
+
+`GET /api/ops/traffic`: `{ "instances": [{ "service", "instanceId", "available", "requests": { "/incidents": 8, "/incidents/{id}": 0 } }] }`. Counts are Micrometer `http.server.requests` by URI template since the pod started.
+
+`GET /api/ops/kubernetes`: `{ "namespace", "available", "reason"?, "deployments": [{ "name", "desired", "ready", "available", "updated", "image" }], "pods": [{ "name", "app", "phase", "ready", "restarts", "startedAt", "terminating" }], "services": [{ "name", "type", "ports": [{ "port", "nodePort"? }] }] }`. Outside a cluster the answer is `{ "available": false, "reason": "..." }`.
