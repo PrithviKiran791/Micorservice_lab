@@ -34,3 +34,8 @@ eureka:
     lease-expiration-duration-in-seconds: 15
 # Spring Cloud LoadBalancer keeps a copy of the instance list; refresh it quickly so scale up/down is noticed.
 spring.cloud.loadbalancer.cache.ttl: 5s
+
+# How long the gateway waits for a service before giving up (and, for GET, retrying another copy).
+spring.cloud.gateway.server.webflux.httpclient:
+  connect-timeout: 1000      # milliseconds to open a connection (inside the cluster this takes a few ms)
+  response-timeout: 8s       # time to wait for the answer

@@ -9,8 +9,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 5 done (scripts, Postman, 2 clean rehearsals pass); next Phase 6 docs/diagrams and gateway GET retry |
-| Next action | Phase 6: VIVA_SCRIPT, QUICK_REVISION, DEMO_SCRIPT, TEST_REPORT, 6 diagrams; gateway retry for GET |
+| Phase | 5 done + gateway GET retry done; next Phase 6 docs/diagrams (viva, demo script, TEST_REPORT, 6 diagrams) |
+| Next action | Phase 6: VIVA_SCRIPT, QUICK_REVISION, DEMO_SCRIPT, TEST_REPORT, 6 diagrams; public/lab URL needs owner approval |
 | Blockers | Public/lab URL for the "Deployed" row needs the owner approval (tunnel tool or LAN exposure) |
 | Last updated | 25 Nov 2026 |
 
@@ -144,6 +144,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | JVM pods: limit 768Mi, MaxRAMPercentage 60, SerialGC, C1 only, -Xss512k; startupProbe failureThreshold 90; deploy waits up to 900 s | Windows ran out of memory (29.7/32.7 GB committed) and the Docker VM was starved: pods missed the 200 s startup probe, load test timed out |
 | 25 Nov 2026 | Postman folders 0-5 run automatically; folder 6 (resilience) is manual because it needs kubectl scale; PATCH/POST responders from ui.md are not built (stretch) | Keep Postman green without kubectl; scripts/demo-resilience.ps1 automates folder 6 |
 | 25 Nov 2026 | Added scripts/lib.ps1, generate-references.ps1 (docs/viva/CODE_REFERENCES.md, 40 refs), rehearsal.ps1 | Phase 5 deliverables; references generated from source, never typed |
+| 25 Nov 2026 | Gateway retries failed GET requests (2 retries, 50-500 ms backoff, on IOException/timeout and 502/503/504) via the lb:// route; POST is never retried. Gateway httpclient: connect-timeout 1 s, response-timeout 8 s | A dying pod caused 503s and 30 s hangs while the registry/load-balancer cache caught up. Retry only for idempotent GET so "report incident" cannot be duplicated |
+| 25 Nov 2026 | Added scripts/demo-failover.ps1 (delete an incident pod under traffic) and wired it into rehearsal.ps1 | Evidence for the Handles traffic / Resilience rows |
 
 ## Work log
 
@@ -161,6 +163,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Eureka in Minikube (9 pods, fresh deploy): registry lists api-gateway, auth, incident x2, responder, notification (all UP); incident+gateway flow OK; 10 calls split 6/4 over the two incident pods; responder scaled to 0 -> removed from registry, incident PENDING in 57 ms, /api/responders 503, login/list OK; scaled to 1 -> dispatch ASSIGNED within 1 s of polling. incident 19/19, auth 5/5, responder 4/4, notification 9/9 tests still pass | Done |
 | 25 Nov 2026 | Claude | Failover: deleting one incident pod during 25 s of calls gave HTTP 200 x10, 503 x6, timeout x1 (stale registry/cache for a few seconds). Load test 1,500 requests: 1,419 OK, 81 timeouts, 50/50 split over 2 incident pods, 4 req/s; all 9 pods restarted once during the run (exit 143 from failed probes; one JVM OOM-killed in the kernel log); recovered by themselves in ~2 min. Pods idle at ~320 of 512 Mi | **Open: load test not passing** |
 | 25 Nov 2026 | Claude | Phase 5 rehearsal run attempt 1 FAILED at deploy (8+ min, pods killed by the 200 s startup probe; Windows memory exhausted, JVM steps taking 30-80 s); also found my runner swallowed child output. Fixed (lighter JVM flags, probe 450 s, deploy wait 900 s, Out-Host). **Run 1 PASS** (deploy 90 s, smoke 32/32, resilience 16/16, newman 43/43, load 1500x200 at 146 req/s p95 271 ms 50/50 split, references 40/40); **run 2 PASS** (deploy 104 s, same checks, load 127 req/s p95 295 ms); all 9 pods 0 restarts | Done |
+| 25 Nov 2026 | Claude | Gateway retry. Before (old gateway): deleting one incident pod under traffic -> 9 of 32 GETs failed (eight 503 + one 30 s hang). After: 114 of 114 GETs returned 200, slowest 1.08 s (first attempt with a 2 s connect timeout: 107/107 OK but slowest 2.09 s, so the timeout was lowered to 1 s). Gateway tests 14/14 (new GatewayRetryTest: GETs succeed with one dead copy; POSTs not retried; fails without the retry config). My own script bug found on the way (PowerShell passed -split to kubectl) | Done |
+| 25 Nov 2026 | Claude | Rehearsal run 3 (with failover step) first attempt FAILED one check: GET /api/responders returned 503 right after dispatch worked (gateway registry copy lags up to ~13 s). Check now polls; passed after 3 s. **Run 3 PASS**: deploy 80 s, smoke 32/32, resilience 16/16, failover 7/7 (111/111 x 200, slowest 1.09 s), newman 43/43, load 1500 x 200 at 136 req/s p95 236 ms (50/50 split), references 43/43, 0 restarts | Done |
 
 ## Command cheat sheet (demo day)
 

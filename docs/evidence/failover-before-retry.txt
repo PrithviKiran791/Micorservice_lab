@@ -1,0 +1,27 @@
+# scripts\demo-failover.ps1 against the OLD gateway (no GET retry), 25 Nov 2026: 9 of 32 requests failed
+Gateway not reachable on http://localhost:8080 - starting: kubectl port-forward svc/api-gateway 8080:8080
+
+=== 1. Two incident-service pods are running
+PASS  two incident-service pods are Ready                                    
+PASS  requests are answered by both pods                                     -> incident-service-7784d44bbd-ngsbm, incident-service-7784d44bbd-s82n6
+
+=== 2. Delete pod incident-service-7784d44bbd-ngsbm while requests keep flowing (30 s)
+   t=3.2s  kubectl delete pod incident-service-7784d44bbd-ngsbm
+   t=3.4s  HTTP 503 (19 ms)
+   t=3.9s  HTTP 503 (6 ms)
+   t=4.3s  HTTP 503 (7 ms)
+   t=5.0s  HTTP 503 (6 ms)
+   t=5.5s  HTTP 503 (6 ms)
+   t=5.9s  HTTP 503 (6 ms)
+   t=6.4s  HTTP 503 (6 ms)
+   t=6.9s  HTTP 503 (6 ms)
+   t=37.3s  HTTP 0 (30011 ms)
+FAIL  all 32 requests during the failover returned HTTP 200                  -> 9 failed
+FAIL  no request was slow (every answer under 2 s)                           -> slowest 30011 ms
+
+=== 3. Kubernetes replaced the pod
+PASS  two Ready incident-service pods again                                  
+PASS  the deleted pod was replaced by a new one                              -> incident-service-7784d44bbd-h75bw, incident-service-7784d44bbd-s82n6
+PASS  both pods answer again                                                 -> incident-service-7784d44bbd-h75bw, incident-service-7784d44bbd-s82n6
+
+demo-failover: 5 passed, 2 failed

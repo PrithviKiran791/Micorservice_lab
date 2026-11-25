@@ -86,7 +86,7 @@ The lab slide lists eight criteria. Honest status of each:
 | **Circuit breaker + fallback** | `incident-service` : `client/ResponderClient`, `application.yml` (`resilience4j`) | After repeated failures the breaker opens and calls fail instantly; the fallback turns "no answer" into a `PENDING` incident. A 409 "no responder free" is a normal answer, not a failure. |
 | **JWT filter at the gateway** | `api-gateway` : `security/JwtAuthenticationFilter` | A `GlobalFilter` with highest priority rejects bad tokens with 401 before any service is called, and replaces identity headers with verified ones. |
 
-Other patterns used: idempotent consumer (unique `event_id`), database-per-service, `X-Served-By` header to show which pod answered, Kubernetes init containers (wait for Postgres/RabbitMQ), startup/liveness/readiness probes.
+Other patterns used: gateway retry of idempotent GETs, idempotent consumer (unique `event_id`), database-per-service, `X-Served-By` header to show which pod answered, Kubernetes init containers (wait for Postgres/RabbitMQ), startup/liveness/readiness probes.
 
 ---
 
@@ -105,7 +105,7 @@ api-gateway/  auth-service/  incident-service/  responder-service/  notification
 k8s/                      Kubernetes manifests (namespace resqnet), applied in file-name order
 db/init-databases.sh      creates the 4 databases and 4 users (also embedded in k8s/02-config.yaml)
 docker-compose.yml        local Postgres (host port 5433) + RabbitMQ
-scripts/                  deploy-minikube.ps1, smoke-test.ps1, demo-resilience.ps1, load-test.ps1, verify-references.ps1,`n                          generate-references.ps1, rehearsal.ps1 (all of them from a clean cluster), lib.ps1 (shared helpers)`npostman/                   ResQNet-Lite.postman_collection.json (28 requests, all with status-code tests)
+scripts/                  deploy-minikube.ps1, smoke-test.ps1, demo-resilience.ps1, demo-failover.ps1, load-test.ps1, verify-references.ps1,`n                          generate-references.ps1, rehearsal.ps1 (all of them from a clean cluster), lib.ps1 (shared helpers)`npostman/                   ResQNet-Lite.postman_collection.json (28 requests, all with status-code tests)
 docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, tracker,`n                          viva/CODE_REFERENCES.md (generated file:line references), evidence/ (rehearsal logs)
 Documents/                original planning documents and prompts (kept as received)
 AGENTS.md                 conventions for AI coding agents working in this repo
@@ -233,7 +233,7 @@ Beyond unit tests, these were run against the real cluster: a 10-case security c
 
 Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on a freshly deployed cluster, through `kubectl port-forward`):** 20 users x 25 rounds x 3 endpoints = 1,500 requests, **all HTTP 200**; 10.3 s / 146 requests/s and 11.8 s / 127 requests/s; latency avg 134 / 153 ms, p95 271 / 295 ms, max 498 / 506 ms; `/api/incidents` answered 250 + 250 by the two incident pods. Full logs: `docs/evidence/`. An earlier attempt failed (81 timeouts, pods restarted) while Windows itself was out of memory (29.7 of 32.7 GB committed, heavy paging, so the Docker VM was starved); the manifests now use a lighter JVM (serial GC, C1 compiler, small stacks, 768 Mi limit) and a more patient startup probe (450 s), and the lab laptop should have other heavy applications closed during the demo.
 
-**Honest notes from testing:** while one pod of a service is being deleted and replaced, a few requests can receive 503 until the registry and the gateway's cache notice (seconds). Retrying idempotent GET requests at the gateway is a planned improvement.
+**Failover (measured):** `scripts/demo-failover.ps1` deletes one of the two incident-service pods while GET requests keep flowing. With the **old** gateway 9 of 32 requests failed (eight 503s and one request that hung for 30 s). With the **gateway retry** (failed GETs are retried on the other copy, 1 s connect timeout) all 114 of 114 requests returned HTTP 200 and the slowest took 1.08 s. POST requests are deliberately not retried automatically (a repeated "report incident" could create two incidents), so a POST sent in the same second can still fail once and should be repeated by the caller.
 
 ---
 
@@ -254,19 +254,19 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 
 ## 11. Project status and what is left
 
-**Rehearsal result:** `scripts\rehearsal.ps1` deletes the namespace, deploys, and runs the smoke test (32 checks), the resilience demo (16 checks), the Postman collection with newman (43 assertions), the load test and the code-reference check. It **passed twice in a row from a clean cluster**, with every pod at 0 restarts (logs in `docs/evidence/`).
+**Rehearsal result:** `scripts\rehearsal.ps1` deletes the namespace, deploys, and runs the smoke test (32 checks), the resilience demo (16 checks), the failover demo (7 checks), the Postman collection with newman (43 assertions), the load test and the code-reference check. It **passed twice in a row from a clean cluster**, and passed again after the gateway retry was added, now with the `demo-failover.ps1` step as well (8 steps, latest log `docs/evidence/rehearsal-run3.txt`); every pod ended with 0 restarts.
 
 | Script | Purpose |
 |---|---|
 | `scripts/deploy-minikube.ps1` | build jars and images, load them into Minikube, apply `k8s/`, wait for Ready |
 | `scripts/smoke-test.ps1` | health, security, register/login, incident, notification, roles, validation (PASS/FAIL per step, exit code) |
 | `scripts/demo-resilience.ps1` | scale responder-service to 0 and back; the rest keeps answering |
+| `scripts/demo-failover.ps1` | delete one of two incident-service pods under traffic; every GET must still return 200 |
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 
 Still to do (tracked in `docs/tracker.md`):
 - viva script, quick revision sheet, demo script, `docs/TEST_REPORT.md` and the six diagrams (the code-reference table in `docs/viva/CODE_REFERENCES.md` is already generated)
-- gateway retry for idempotent GETs (a 25 s test that deleted one incident pod saw 6 x HTTP 503 and one timeout before the registry caught up)
 - a public or lab URL for the "Deployed" row (needs a tunnel tool or LAN exposure, which requires the owner's approval)
 - the optional admin endpoints for responders (create, set OFFLINE) were not built

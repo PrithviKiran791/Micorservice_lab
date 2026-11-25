@@ -47,7 +47,10 @@ Every row gives the file, the exact line number and the code snippet found there
 | Concept | File:line | Snippet | Class / method | Rubric row |
 |---|---|---|---|---|
 | The registry (Eureka server) | `discovery-service/src/main/java/com/resqnet/discovery/DiscoveryServiceApplication.java:12` | `@EnableEurekaServer` | DiscoveryServiceApplication | Service discovery |
-| Gateway routes by service NAME, not address | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:34` | `.uri("lb://incident-service"))` | GatewayRoutes.routes | Service discovery, Handles traffic |
+| Failed GET requests are retried on another copy (smooth failover) | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:60` | `.setMethods(HttpMethod.GET)` | GatewayRoutes.standardFilters | Handles traffic, Resilience |
+| Test: GETs succeed although one copy is dead; POSTs are never repeated | `api-gateway/src/test/java/com/resqnet/gateway/config/GatewayRetryTest.java:75` | `void getRequestsSucceedEvenThoughOneCopyIsDead()` | GatewayRetryTest | Testing |
+| Gateway gives up on a dead copy after 1 s | `api-gateway/src/main/resources/application.yml:40` | `connect-timeout: 1000` | application.yml (httpclient) | Resilience |
+| Gateway routes by service NAME, not address | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:46` | `.uri("lb://incident-service"))` | GatewayRoutes.routes | Service discovery, Handles traffic |
 | incident-service finds responder-service by name | `incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:13` | `@LoadBalanced` | RestClientConfig.loadBalancedRestClientBuilder | Service discovery |
 | Every service registers with Eureka | `incident-service/src/main/resources/application.yml:66` | `defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}` | application.yml (eureka.client) | Service discovery |
 | Two copies of incident-service | `k8s/21-incident.yaml:8` | `replicas: 2` | Deployment incident-service | Handles traffic |

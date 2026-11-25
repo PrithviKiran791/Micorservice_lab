@@ -8,6 +8,7 @@
   2. scripts\deploy-minikube.ps1          (jars + images are rebuilt only with -Rebuild)
   3. scripts\smoke-test.ps1
   4. scripts\demo-resilience.ps1          (scales responder-service to 0 and back)
+     scripts\demo-failover.ps1            (deletes one incident pod while traffic flows)
   5. Postman collection folders 0-5 run with newman (npx downloads it once; free npm package)
   6. scripts\load-test.ps1                (skip with -SkipLoadTest)
   7. scripts\verify-references.ps1
@@ -58,6 +59,7 @@ try {
 
     $null = Run-Step 'smoke-test.ps1' { & $ps @psArgs "$PSScriptRoot\smoke-test.ps1" -BaseUrl $BaseUrl }
     $null = Run-Step 'demo-resilience.ps1' { & $ps @psArgs "$PSScriptRoot\demo-resilience.ps1" -BaseUrl $BaseUrl }
+    $null = Run-Step 'demo-failover.ps1 (delete an incident pod under traffic)' { & $ps @psArgs "$PSScriptRoot\demo-failover.ps1" -BaseUrl $BaseUrl }
     $null = Run-Step 'Postman collection (newman, folders 0-5)' {
         Push-Location $root
         npx.cmd -y newman run postman\ResQNet-Lite.postman_collection.json --folder '0 - Health' --folder '1 - Security' --folder '2 - Auth' --folder '3 - Incidents' --folder '4 - Notifications' --folder '5 - Responders' --reporters cli --color off

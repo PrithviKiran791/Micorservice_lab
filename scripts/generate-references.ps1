@@ -40,6 +40,9 @@ $entries = @(
     @('JWT at the gateway (api-gateway)', 'Registration always creates a USER', "auth-service/$j/auth/service/AuthService.java", 'passwordEncoder.encode(request.password()), Role.USER', 'AuthService.register', 'Security'),
 
     @('Service discovery and load balancing', 'The registry (Eureka server)', "discovery-service/$j/discovery/DiscoveryServiceApplication.java", '@EnableEurekaServer', 'DiscoveryServiceApplication', 'Service discovery'),
+    @('Service discovery and load balancing', 'Failed GET requests are retried on another copy (smooth failover)', "api-gateway/$j/gateway/config/GatewayRoutes.java", '.setMethods(HttpMethod.GET)', 'GatewayRoutes.standardFilters', 'Handles traffic, Resilience'),
+    @('Service discovery and load balancing', 'Test: GETs succeed although one copy is dead; POSTs are never repeated', "api-gateway/src/test/java/com/resqnet/gateway/config/GatewayRetryTest.java", 'void getRequestsSucceedEvenThoughOneCopyIsDead()', 'GatewayRetryTest', 'Testing'),
+    @('Service discovery and load balancing', 'Gateway gives up on a dead copy after 1 s', 'api-gateway/src/main/resources/application.yml', 'connect-timeout: 1000', 'application.yml (httpclient)', 'Resilience'),
     @('Service discovery and load balancing', 'Gateway routes by service NAME, not address', "api-gateway/$j/gateway/config/GatewayRoutes.java", '.uri("lb://incident-service"))', 'GatewayRoutes.routes', 'Service discovery, Handles traffic'),
     @('Service discovery and load balancing', 'incident-service finds responder-service by name', "incident-service/$j/incident/config/RestClientConfig.java", '@LoadBalanced', 'RestClientConfig.loadBalancedRestClientBuilder', 'Service discovery'),
     @('Service discovery and load balancing', 'Every service registers with Eureka', 'incident-service/src/main/resources/application.yml', 'defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}', 'application.yml (eureka.client)', 'Service discovery'),

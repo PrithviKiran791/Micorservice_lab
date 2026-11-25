@@ -138,6 +138,7 @@ Login, list incidents and notifications continue to work because they do not dep
 | RabbitMQ down | Publish fails; incident is still saved. Log error, return 201 (accepted trade-off for MVP) |
 | auth-service down | Existing tokens keep working (gateway validates locally); no new logins |
 | incident-service pod restarts | State is in Postgres; Kubernetes restarts the pod |
+| One copy of a service dies (e.g. one of two incident-service pods) | Gateway retries failed GET requests on another copy (up to 2 retries, 1 s connect timeout, 8 s response timeout); POST is never retried automatically. Measured: pod deleted under traffic, 114 of 114 GET requests returned 200, slowest 1.08 s (before the retry: 9 failures including a 30 s hang) |
 | Gateway down | Everything unreachable (single entry point; mitigated by 2 replicas if time permits) |
 
 Kubernetes provides self-healing (restarts failed containers) and readiness probes so traffic only

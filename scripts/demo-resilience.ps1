@@ -70,7 +70,10 @@ try {
     Check 'ADMIN dispatch turns the PENDING incident into ASSIGNED' ($null -ne $dispatched) "-> $($dispatched.Json.status) $($dispatched.Json.assignedResponder.name)"
     $note = Wait-Until { $n = Api GET '/api/notifications' $null $userToken; if (@($n.Json | Where-Object { $_.incidentId -eq $pending.id -and $_.type -eq 'INCIDENT_ASSIGNED' }).Count -ge 1) { $n.Json } } 20
     Check 'the "assigned" notification arrived' ($null -ne $note)
-    $r = Api GET '/api/responders' $null $userToken;  Check 'GET /api/responders works again' ($r.Code -eq 200) "-> $($r.Code)"
+    # The gateway has its own copy of the service registry (refreshed every few seconds), so it may need a moment longer than incident-service.
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $back = Wait-Until { $x = Api GET '/api/responders' $null $userToken; if ($x.Code -eq 200) { $x } } 45 1000
+    Check 'GET /api/responders works again (the gateway notices the returned service)' ($null -ne $back) "-> answered 200 after $([int]$sw.Elapsed.TotalSeconds) s"
 }
 finally {
     # Always leave the cluster healthy and tidy.
