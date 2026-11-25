@@ -1,0 +1,73 @@
+# auth-service: registers users and issues JWTs. ClusterIP = reachable only inside the cluster, through the gateway.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      # Wait until PostgreSQL accepts connections, so the app does not crash and restart while the database boots.
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U postgres; do echo waiting for postgres; sleep 2; done"]
+      containers:
+        - name: auth-service
+          image: resqnet/auth-service:1.0
+          imagePullPolicy: IfNotPresent      # images are loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 8081
+          env:
+            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
+              value: "-XX:MaxRAMPercentage=70"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/auth_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "auth_user"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: AUTH_DB_PASSWORD } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: JWT_SECRET } }
+            - name: JWT_ISSUER
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: JWT_ISSUER } }
+            - name: JWT_EXPIRY_MINUTES
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: JWT_EXPIRY_MINUTES } }
+          # startupProbe gives the JVM time to boot; after it succeeds the other two probes take over.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 40
+          # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # readiness: "can it serve traffic?"  If it fails, the pod is removed from the Service.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: resqnet
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 8081
+      targetPort: 8081

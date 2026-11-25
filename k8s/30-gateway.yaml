@@ -1,0 +1,69 @@
+# api-gateway: the ONLY entry point (rule R-K8-4). NodePort 30080; from Windows use kubectl port-forward svc/api-gateway 8080:8080.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: resqnet/api-gateway:1.0
+          imagePullPolicy: IfNotPresent      # images are loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
+              value: "-XX:MaxRAMPercentage=70"
+            - name: AUTH_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: AUTH_SERVICE_URL } }
+            - name: INCIDENT_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: INCIDENT_SERVICE_URL } }
+            - name: RESPONDER_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: NOTIFICATION_SERVICE_URL } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: JWT_SECRET } }
+            - name: JWT_ISSUER
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: JWT_ISSUER } }
+          # startupProbe gives the JVM time to boot; after it succeeds the other two probes take over.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 40
+          # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # readiness: "can it serve traffic?"  If it fails, the pod is removed from the Service.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: resqnet
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080

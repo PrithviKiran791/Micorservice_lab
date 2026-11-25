@@ -1,0 +1,84 @@
+# One PostgreSQL server holding four databases (decision D1). The data lives on a PersistentVolumeClaim,
+# so it survives pod restarts. Only reachable inside the cluster (ClusterIP).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: resqnet
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: resqnet
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # the volume can be used by one pod at a time
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: resqnet-secrets, key: POSTGRES_PASSWORD } } }
+            - { name: AUTH_DB_PASSWORD, valueFrom: { secretKeyRef: { name: resqnet-secrets, key: AUTH_DB_PASSWORD } } }
+            - { name: INCIDENT_DB_PASSWORD, valueFrom: { secretKeyRef: { name: resqnet-secrets, key: INCIDENT_DB_PASSWORD } } }
+            - { name: RESPONDER_DB_PASSWORD, valueFrom: { secretKeyRef: { name: resqnet-secrets, key: RESPONDER_DB_PASSWORD } } }
+            - { name: NOTIFICATION_DB_PASSWORD, valueFrom: { secretKeyRef: { name: resqnet-secrets, key: NOTIFICATION_DB_PASSWORD } } }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: resqnet
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

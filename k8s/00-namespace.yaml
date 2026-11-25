@@ -1,0 +1,6 @@
+# Everything lives in one namespace (rule R-K8-1). Deleting it removes the whole system:
+#   kubectl delete ns resqnet
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: resqnet

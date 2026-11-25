@@ -9,8 +9,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 2 done (walking-skeleton Minikube deploy still to do); next Phase 3 events |
-| Next action | Walking skeleton on Minikube, then Phase 3: RabbitMQ events + notification-service |
+| Phase | Walking skeleton done on Minikube; next Phase 3 (events + notification-service) |
+| Next action | Phase 3: RabbitMQ declarables, publisher, notification-service |
 | Blockers | None (GitHub push awaiting authorization) |
 | Last updated | 25 Nov 2026 |
 
@@ -132,6 +132,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Spring Cloud BOM only in api-gateway; Resilience4j 2.3.0 in incident-service | Cloud BOM pins resilience4j-spring6 to 2.2.0, which broke start-up with resilience4j-spring-boot3 2.3/2.4 |
 | 25 Nov 2026 | No retry on assign; RestClient timeouts + circuit breaker only | Keeps fallback fast (R-RS-5 allows at most one retry); assign stays idempotent |
 | 25 Nov 2026 | responder-service adds schema.sql (CHECK + partial unique index) run after Hibernate | ddl-auto cannot express them; they are the DB-level guarantee of one responder per incident |
+| 25 Nov 2026 | App Deployments use an initContainer (postgres:16, pg_isready) before starting | Without it the apps crashed 3x while Postgres ran its init script, causing RESTARTS > 0 |
+| 25 Nov 2026 | scripts/deploy-minikube.ps1 builds with Docker Desktop and uses `minikube image load`; $ErrorActionPreference=Continue | containerd runtime; PS 5.1 aborts on native stderr under Stop |
 
 ## Work log
 
@@ -143,6 +145,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Preflight; 5 Maven skeletons; `mvn clean compile` passes on JDK 17 for all 5 | Done |
 | 25 Nov 2026 | Claude | Phase 1: compose (Postgres 4 DBs + RabbitMQ), auth-service, gateway routes + JWT filter. auth 5/5 tests, gateway 12/12 tests; live checks through gateway: 401 no/garbage/wrong-secret token, 201/409/400 register, 401 login, /me, forged header ignored, /internal 404, unrouted-service 503 | Done |
 | 25 Nov 2026 | Claude | Phase 2: responder-service (atomic assign/release), incident-service (create/list/get/dispatch/resolve, RestClient + circuit breaker + PENDING fallback). Tests: responder 4/4 (10 concurrent assigns -> exactly 3 ambulances, mutation check: test fails without SKIP LOCKED), incident 13/13 (409, refused, 3 s hang, 500, breaker OPEN stops calls). Live via gateway: ASSIGNED, 4th ambulance PENDING, responder killed -> PENDING in ~45 ms, /api/responders 503, login/list still fine, restart + dispatch -> ASSIGNED; DB: incident_user cannot connect to auth_db | Done |
+| 25 Nov 2026 | Claude | Walking skeleton: Dockerfiles, k8s 00-22 + 30, scripts/deploy-minikube.ps1. Fresh namespace -> 6 pods 1/1, 0 restarts. Via port-forward: 401 no token, register/login, MEDICAL ASSIGNED, USER dispatch 403; scale responder to 0 -> PENDING (~1 s first call, then ~40 ms), /api/responders 503, login + list OK; scale to 1 -> dispatch ASSIGNED; deleted Postgres pod -> data kept (3 incidents before/after), auth readiness dipped to 0/1 then recovered. `\l` in the postgres pod shows the 4 databases | Done |
 
 ## Command cheat sheet (demo day)
 

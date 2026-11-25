@@ -1,0 +1,67 @@
+# responder-service: responder catalogue and atomic assignment. The scale-to-zero resilience demo targets this Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: responder-service
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: responder-service
+  template:
+    metadata:
+      labels:
+        app: responder-service
+    spec:
+      # Wait until PostgreSQL accepts connections, so the app does not crash and restart while the database boots.
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U postgres; do echo waiting for postgres; sleep 2; done"]
+      containers:
+        - name: responder-service
+          image: resqnet/responder-service:1.0
+          imagePullPolicy: IfNotPresent      # images are loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 8083
+          env:
+            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
+              value: "-XX:MaxRAMPercentage=70"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/responder_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "responder_user"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: RESPONDER_DB_PASSWORD } }
+          # startupProbe gives the JVM time to boot; after it succeeds the other two probes take over.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8083 }
+            periodSeconds: 5
+            failureThreshold: 40
+          # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8083 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # readiness: "can it serve traffic?"  If it fails, the pod is removed from the Service.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8083 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: responder-service
+  namespace: resqnet
+spec:
+  selector:
+    app: responder-service
+  ports:
+    - port: 8083
+      targetPort: 8083

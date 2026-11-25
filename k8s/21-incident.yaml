@@ -1,0 +1,77 @@
+# incident-service: incident lifecycle; calls responder-service (sync) and publishes events (async).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incident-service
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incident-service
+  template:
+    metadata:
+      labels:
+        app: incident-service
+    spec:
+      # Wait until PostgreSQL accepts connections, so the app does not crash and restart while the database boots.
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U postgres; do echo waiting for postgres; sleep 2; done"]
+      containers:
+        - name: incident-service
+          image: resqnet/incident-service:1.0
+          imagePullPolicy: IfNotPresent      # images are loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 8082
+          env:
+            - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
+              value: "-XX:MaxRAMPercentage=70"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/incident_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "incident_user"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: INCIDENT_DB_PASSWORD } }
+            - name: RESPONDER_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
+            - name: SPRING_RABBITMQ_HOST
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: SPRING_RABBITMQ_HOST } }
+            - name: SPRING_RABBITMQ_PORT
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: SPRING_RABBITMQ_PORT } }
+            - name: SPRING_RABBITMQ_USERNAME
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: RABBITMQ_DEFAULT_USER } }
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom: { secretKeyRef: { name: resqnet-secrets, key: RABBITMQ_DEFAULT_PASS } }
+          # startupProbe gives the JVM time to boot; after it succeeds the other two probes take over.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8082 }
+            periodSeconds: 5
+            failureThreshold: 40
+          # liveness: "is the process alive?"  If it fails, Kubernetes restarts the container.
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8082 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # readiness: "can it serve traffic?"  If it fails, the pod is removed from the Service.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8082 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incident-service
+  namespace: resqnet
+spec:
+  selector:
+    app: incident-service
+  ports:
+    - port: 8082
+      targetPort: 8082
