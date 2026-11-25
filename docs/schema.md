@@ -61,6 +61,7 @@ CREATE TABLE incidents (
     reported_by_username     VARCHAR(50)  NOT NULL,
     assigned_responder_id    BIGINT,                    -- logical ref to responder_db.responders.id
     assigned_responder_name  VARCHAR(100),
+    assigned_responder_type  VARCHAR(15),               -- AMBULANCE | FIRE_TRUCK | POLICE (API contract shows it)
     created_at               TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at               TIMESTAMPTZ  NOT NULL DEFAULT now(),
     resolved_at              TIMESTAMPTZ

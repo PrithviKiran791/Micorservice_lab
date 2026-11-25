@@ -64,7 +64,7 @@ Spring AMQP + RabbitMQ 3, Resilience4j, jjwt 0.12.x, Maven, Docker, Kubernetes (
   (sliding window 5, minimum 3 calls, 50 % failure threshold, 10 s open state, 2 half-open probes).
 - Fallback: mark the incident `PENDING`, publish `incident.pending`, return 201.
 - A business answer of `409 NO_RESPONDER_AVAILABLE` is **not** counted as a circuit failure; it also results in `PENDING`.
-- The assign endpoint is idempotent per `incidentId`, so one retry on connection errors is safe.
+- The assign endpoint is idempotent per `incidentId`, so a retry would be safe; none is configured (rule R-RS-5 allows at most one) to keep the fallback fast and the code simple.
 
 ### 5.2 Asynchronous: incident-service -> notification-service
 

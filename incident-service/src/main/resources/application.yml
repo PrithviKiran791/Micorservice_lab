@@ -1,5 +1,54 @@
+# incident-service configuration. Everything comes from environment variables.
+# For local runs use the "local" profile (application-local.yml), which holds DEMO values only.
 server:
   port: ${SERVER_PORT:8082}
+
 spring:
   application:
     name: incident-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update          # dev/lab only (rule R-DB-1); Flyway is future work
+    open-in-view: false
+
+# The synchronous dependency: responder-service (Kubernetes DNS name in the cluster)
+responder:
+  service:
+    url: ${RESPONDER_SERVICE_URL}
+    connect-timeout-ms: 1000    # rule R-RS-1: connect <= 1 s
+    read-timeout-ms: 2000       # rule R-RS-1: read <= 2 s
+
+# Circuit breaker "responderService" (hard idea #2), used by client/ResponderClient.
+resilience4j:
+  circuitbreaker:
+    instances:
+      responderService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5                      # judge the last 5 calls
+        minimum-number-of-calls: 3                  # need at least 3 calls before judging
+        failure-rate-threshold: 50                  # open when >= 50 % of them failed
+        wait-duration-in-open-state: 10s            # stay open (fail fast) for 10 s
+        permitted-number-of-calls-in-half-open-state: 2   # then let 2 probe calls through
+        automatic-transition-from-open-to-half-open-enabled: true
+        # Only real infrastructure problems count as failures. A business answer such as
+        # 409 NO_RESPONDER_AVAILABLE (a 4xx) is NOT a failure (rule R-RS-2).
+        record-exceptions:
+          - org.springframework.web.client.ResourceAccessException    # refused / timeout
+          - org.springframework.web.client.HttpServerErrorException   # responder answered 5xx
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db   # not Ready until the database answers (R-RS-4)

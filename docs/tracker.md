@@ -9,8 +9,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 1 done except Actuator probes in remaining services; next Phase 2 |
-| Next action | Phase 2: responder-service, incident-service (circuit breaker) |
+| Phase | 2 done (walking-skeleton Minikube deploy still to do); next Phase 3 events |
+| Next action | Walking skeleton on Minikube, then Phase 3: RabbitMQ events + notification-service |
 | Blockers | None (GitHub push awaiting authorization) |
 | Last updated | 25 Nov 2026 |
 
@@ -50,16 +50,16 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 2 - Core dispatch (Hours 4-8)
 
-- [ ] **responder-service**: entity, repository, seed 9 responders
-- [ ] **responder-service**: `GET /responders`, `GET /responders/{id}`
-- [ ] **responder-service**: `POST /internal/responders/assign` (row lock, idempotent) and `/release`
-- [ ] Test: two concurrent assigns never return the same responder
-- [ ] **incident-service**: entity, repository, DTOs, validation, global exception handler
-- [ ] **incident-service**: `POST /incidents` (save REPORTED -> call assign -> ASSIGNED)
-- [ ] **incident-service**: RestClient with timeouts + Resilience4j circuit breaker + fallback to `PENDING`
-- [ ] **incident-service**: `GET /incidents`, `GET /incidents/{id}` (owner/admin rules)
-- [ ] **incident-service**: `POST /incidents/{id}/dispatch` and `/resolve` (admin)
-- [ ] End-to-end through the gateway: report incident -> `ASSIGNED`; stop responder-service locally -> `PENDING`
+- [x] **responder-service**: entity, repository, seed 9 responders
+- [x] **responder-service**: `GET /responders`, `GET /responders/{id}`
+- [x] **responder-service**: `POST /internal/responders/assign` (row lock, idempotent) and `/release`
+- [x] Test: two concurrent assigns never return the same responder
+- [x] **incident-service**: entity, repository, DTOs, validation, global exception handler
+- [x] **incident-service**: `POST /incidents` (save REPORTED -> call assign -> ASSIGNED)
+- [x] **incident-service**: RestClient with timeouts + Resilience4j circuit breaker + fallback to `PENDING`
+- [x] **incident-service**: `GET /incidents`, `GET /incidents/{id}` (owner/admin rules)
+- [x] **incident-service**: `POST /incidents/{id}/dispatch` and `/resolve` (admin)
+- [x] End-to-end through the gateway: report incident -> `ASSIGNED`; stop responder-service locally -> `PENDING`
 
 ## Phase 3 - Async events (Hours 8-10)
 
@@ -128,6 +128,10 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Builds run with JAVA_HOME set to JDK 17 per command | Default java on PATH is 25 |
 | 25 Nov 2026 | Business services set JVM default timezone to UTC in main() | JVM zone "Asia/Calcutta" is rejected by PostgreSQL; also satisfies R-CD-8 |
 | 25 Nov 2026 | Gateway sets `X-Gateway-Prefix: /api`; service errors use it for `path` | Contract shows public paths in error bodies; X-Forwarded-Prefix is overwritten by the gateway's own filter |
+| 25 Nov 2026 | Added `assigned_responder_type` column to incidents (docs/schema.md) | API contract shows responder type in the Incident object; contract outranks schema |
+| 25 Nov 2026 | Spring Cloud BOM only in api-gateway; Resilience4j 2.3.0 in incident-service | Cloud BOM pins resilience4j-spring6 to 2.2.0, which broke start-up with resilience4j-spring-boot3 2.3/2.4 |
+| 25 Nov 2026 | No retry on assign; RestClient timeouts + circuit breaker only | Keeps fallback fast (R-RS-5 allows at most one retry); assign stays idempotent |
+| 25 Nov 2026 | responder-service adds schema.sql (CHECK + partial unique index) run after Hibernate | ddl-auto cannot express them; they are the DB-level guarantee of one responder per incident |
 
 ## Work log
 
@@ -138,6 +142,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | me | Docker Desktop installed; engine running | OK |
 | 25 Nov 2026 | Claude | Preflight; 5 Maven skeletons; `mvn clean compile` passes on JDK 17 for all 5 | Done |
 | 25 Nov 2026 | Claude | Phase 1: compose (Postgres 4 DBs + RabbitMQ), auth-service, gateway routes + JWT filter. auth 5/5 tests, gateway 12/12 tests; live checks through gateway: 401 no/garbage/wrong-secret token, 201/409/400 register, 401 login, /me, forged header ignored, /internal 404, unrouted-service 503 | Done |
+| 25 Nov 2026 | Claude | Phase 2: responder-service (atomic assign/release), incident-service (create/list/get/dispatch/resolve, RestClient + circuit breaker + PENDING fallback). Tests: responder 4/4 (10 concurrent assigns -> exactly 3 ambulances, mutation check: test fails without SKIP LOCKED), incident 13/13 (409, refused, 3 s hang, 500, breaker OPEN stops calls). Live via gateway: ASSIGNED, 4th ambulance PENDING, responder killed -> PENDING in ~45 ms, /api/responders 503, login/list still fine, restart + dispatch -> ASSIGNED; DB: incident_user cannot connect to auth_db | Done |
 
 ## Command cheat sheet (demo day)
 

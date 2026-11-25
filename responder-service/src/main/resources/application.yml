@@ -1,5 +1,33 @@
+# responder-service configuration. Everything comes from environment variables.
+# For local runs use the "local" profile (application-local.yml), which holds DEMO values only.
 server:
   port: ${SERVER_PORT:8083}
+
 spring:
   application:
     name: responder-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update          # dev/lab only (rule R-DB-1); Flyway is future work
+    open-in-view: false
+    defer-datasource-initialization: true   # run schema.sql AFTER Hibernate created the table
+  sql:
+    init:
+      mode: always              # schema.sql adds the CHECK constraint and the partial unique index
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db   # not Ready until the database answers (R-RS-4)

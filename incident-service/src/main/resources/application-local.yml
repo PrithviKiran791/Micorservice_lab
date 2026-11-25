@@ -1,0 +1,11 @@
+# Local development values (DEMO ONLY, never real secrets). Activate with:
+#   mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/incident_db   # 5433 = docker-compose port mapping
+    username: incident_user
+    password: incident-demo
+
+responder:
+  service:
+    url: http://localhost:8083
