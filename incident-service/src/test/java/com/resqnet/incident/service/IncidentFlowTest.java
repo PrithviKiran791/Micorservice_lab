@@ -21,8 +21,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -69,9 +72,22 @@ class IncidentFlowTest {
     static final AtomicInteger releaseCalls = new AtomicInteger();
     static HttpServer stub;
 
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("responder.service.url", () -> "http://localhost:" + STUB_PORT);
+    /**
+     * In production the client calls the NAME "responder-service" through Eureka + the load balancer.
+     * Here a plain client aimed at the fake server replaces it (same timeouts); the circuit breaker and
+     * fallback under test sit on ResponderClient, not on the HTTP client. The Eureka lookup itself is
+     * verified in the real cluster.
+     */
+    @TestConfiguration
+    static class StubResponderClientConfig {
+        @Bean
+        @Primary
+        RestClient stubResponderRestClient() {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(1000);
+            factory.setReadTimeout(2000);
+            return RestClient.builder().baseUrl("http://localhost:" + STUB_PORT).requestFactory(factory).build();
+        }
     }
 
     @Autowired IncidentService service;

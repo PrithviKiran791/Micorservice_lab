@@ -1,0 +1,264 @@
+# ResQNet Lite
+
+**A microservices-based emergency dispatch platform** built for a college Microservices Lab.
+A user reports an emergency (medical, fire, police). The system saves it, asks a separate service for a free
+responder of the right type, assigns one, and records a notification. If the responder service is down, the
+incident is **still accepted** as `PENDING` and can be dispatched later.
+
+Everything runs as pods on **Minikube** (Kubernetes) behind a single **API Gateway** that checks a **JWT** on every request.
+This is a simulation: no real emergency services or personal data are involved. Total cost: Rs 0 (all free, open-source tools).
+
+---
+
+## 1. What it demonstrates (the lab rubric)
+
+The lab slide lists eight criteria. Honest status of each:
+
+| Criterion | What proves it | Status |
+|---|---|---|
+| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`) | Done on the laptop's Minikube. **Not** reachable from a public/lab URL yet (only via `kubectl port-forward`). |
+| **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Partly.** Load balancing is verified (a 1,500-request run was split 50% / 50% over the two `incident-service` pods). But under 20 simultaneous users through `kubectl port-forward` the run was slow (4 requests/s, 81 timeouts) and all pods restarted once; the Java pods were using about 60% of their 512 Mi limit while idle. Needs higher memory limits and a re-run (see section 9). |
+| **Database** | One PostgreSQL server, **four databases, four users**; a user cannot even connect to another service's database | Done and verified |
+| **Cross-service communication** | **Synchronous:** incident-service calls responder-service (REST). **Asynchronous:** incident-service publishes events to RabbitMQ, notification-service consumes them | Done and verified |
+| **Resilience** | Scale `responder-service` to 0: incidents are still accepted (`PENDING`), login and notifications still work | Done and verified in the cluster |
+| **Service discovery and gateway** | **Eureka** registry + one **Spring Cloud Gateway** entry point routing by service name (`lb://...`) | Done and verified in the cluster |
+| **Security** | JWT checked **at the gateway**; 401 without a valid token, 403 for a USER on admin endpoints | Done and verified (19 checks) |
+| **Testing** | JUnit tests in every service | 49 automated tests pass. A formal test report (`docs/TEST_REPORT.md`) is still to be written. |
+
+---
+
+## 2. Architecture
+
+```text
+                    Postman / PowerShell scripts
+                               |
+                               v
+                  +-------------------------+
+                  |       api-gateway       | :8080  (only thing exposed)
+                  |  JWT check, routing,    |
+                  |  lb:// via Eureka       |
+                  +------------+------------+
+                               |  adds X-User-Id / X-User-Name / X-User-Role
+        +----------------+-----+----------+-------------------+
+        v                v                 v                   v
+ +-------------+  +----------------+ +-----------------+ +--------------------+
+ | auth-service|  | incident-      | | responder-      | | notification-      |
+ |   :8081     |  | service :8082  |>| service :8083   | | service :8084      |
+ |   auth_db   |  |  incident_db   | |  responder_db   | |  notification_db   |
+ +-------------+  +-------+--------+ +-----------------+ +---------^----------+
+                          | sync REST (circuit breaker)           |
+                          +------> RabbitMQ  exchange "resqnet.events" ---+
+                                   (async event incident.assigned / incident.pending)
+
+   discovery-service (Eureka) :8761  <-- every service registers here, gateway/incident look others up by name
+   PostgreSQL (1 server, 4 databases, 4 users)        RabbitMQ (1 broker)
+   --------------------- all in Minikube namespace "resqnet" ---------------------
+```
+
+| Service | Port | Database | Job |
+|---|---|---|---|
+| `api-gateway` | 8080 | none | Single entry point. Verifies the JWT, strips forged identity headers, routes `/api/**` to services by name. Never routes `/internal/**`. |
+| `auth-service` | 8081 | `auth_db` | Register, login (BCrypt), issues HS256 JWTs, seeds a demo admin |
+| `incident-service` | 8082 | `incident_db` | Incident lifecycle; calls responder-service; circuit breaker + fallback; publishes events |
+| `responder-service` | 8083 | `responder_db` | Responder catalogue; **atomic** assignment and release |
+| `notification-service` | 8084 | `notification_db` | Consumes events, stores notifications, de-duplicates by `eventId` |
+| `discovery-service` | 8761 | none | Eureka service registry |
+
+### Request flows
+
+**Report an incident (happy path)**
+1. Client sends `POST /api/incidents` with `Authorization: Bearer <jwt>` to the gateway.
+2. Gateway verifies the token, removes any client `X-User-*` headers, adds trusted ones, and routes to a running `incident-service`.
+3. incident-service saves the incident (`REPORTED`) and commits, **then** calls responder-service `POST /internal/responders/assign` (never inside a database transaction).
+4. responder-service locks one free responder row (`FOR UPDATE SKIP LOCKED`) and marks it `BUSY`.
+5. incident-service sets `ASSIGNED`, publishes `incident.assigned` to RabbitMQ and returns `201`.
+6. notification-service receives the event and stores a notification (ignoring duplicates).
+
+**Responder service down (resilience)**: the call fails fast (1 s connect / 2 s read timeout, then the circuit breaker opens), the **fallback** marks the incident `PENDING`, publishes `incident.pending`, and still returns `201`. Login, listing incidents and notifications are unaffected. When the responder service returns, an admin calls `POST /api/incidents/{id}/dispatch`.
+
+---
+
+## 3. Three ideas worth knowing for the viva
+
+| Idea | Where | In one sentence |
+|---|---|---|
+| **Atomic assignment** | `responder-service` : `ResponderRepository.lockFirstAvailable`, `ResponderService.assign`, `schema.sql` | One SQL query locks the chosen responder row (`FOR UPDATE SKIP LOCKED`), so two simultaneous incidents can never get the same responder; a unique index is the last line of defence. |
+| **Circuit breaker + fallback** | `incident-service` : `client/ResponderClient`, `application.yml` (`resilience4j`) | After repeated failures the breaker opens and calls fail instantly; the fallback turns "no answer" into a `PENDING` incident. A 409 "no responder free" is a normal answer, not a failure. |
+| **JWT filter at the gateway** | `api-gateway` : `security/JwtAuthenticationFilter` | A `GlobalFilter` with highest priority rejects bad tokens with 401 before any service is called, and replaces identity headers with verified ones. |
+
+Other patterns used: idempotent consumer (unique `event_id`), database-per-service, `X-Served-By` header to show which pod answered, Kubernetes init containers (wait for Postgres/RabbitMQ), startup/liveness/readiness probes.
+
+---
+
+## 4. Technology
+
+Java 17 · Spring Boot 3.5 · Spring Cloud 2025.0 (Gateway, Netflix Eureka, LoadBalancer) · Spring Data JPA · PostgreSQL 16 ·
+RabbitMQ 3 (Spring AMQP) · Resilience4j · jjwt 0.12 · Maven · Docker · Kubernetes (Minikube) · JUnit 5, Mockito, Testcontainers · PowerShell scripts.
+
+---
+
+## 5. Repository layout
+
+```text
+api-gateway/  auth-service/  incident-service/  responder-service/  notification-service/  discovery-service/
+                          each: pom.xml, Dockerfile, src/main/java/com/resqnet/<name>/..., src/test/...
+k8s/                      Kubernetes manifests (namespace resqnet), applied in file-name order
+db/init-databases.sh      creates the 4 databases and 4 users (also embedded in k8s/02-config.yaml)
+docker-compose.yml        local Postgres (host port 5433) + RabbitMQ
+scripts/                  deploy-minikube.ps1, load-test.ps1
+docs/                     PRD, Architecture, API_CONTRACT, schema, AUTHENTICATION, rules, ui, tracker
+Documents/                original planning documents and prompts (kept as received)
+AGENTS.md                 conventions for AI coding agents working in this repo
+```
+
+Inside each service the layers are `controller -> service -> repository`, plus `dto`, `model`, `config`, `exception` (and `client`, `messaging`, `security` where needed). Services share **no** code, entities or database.
+
+---
+
+## 6. Run it
+
+### Prerequisites (Windows 11, PowerShell)
+JDK 17 (build with JDK 17 even if another JDK is the default), Maven, Docker Desktop, kubectl, Minikube (docker driver), Git.
+
+### A) On Minikube (the real deployment)
+
+```powershell
+minikube start --driver=docker --cpus=4 --memory=4096
+.\scripts\deploy-minikube.ps1          # builds jars + images, loads them into Minikube, applies k8s/, waits for Ready
+kubectl -n resqnet get pods            # every pod should be 1/1 Running
+kubectl -n resqnet port-forward svc/api-gateway 8080:8080     # then use http://localhost:8080
+```
+
+The Minikube runtime here is containerd, so `minikube docker-env` does not work; the script uses `minikube image load` instead.
+Handy extras:
+
+```powershell
+kubectl -n resqnet port-forward svc/discovery-service 8761:8761   # Eureka dashboard: http://localhost:8761
+kubectl -n resqnet port-forward svc/rabbitmq 15672:15672          # RabbitMQ UI (user resqnet / rabbit-demo)
+kubectl -n resqnet exec deploy/postgres -- psql -U postgres -c "\l"   # shows the 4 databases
+kubectl delete ns resqnet                                         # wipe everything for a clean start
+```
+
+### B) Locally without Kubernetes
+
+```powershell
+docker compose up -d                   # Postgres on localhost:5433 + RabbitMQ on 5672
+# Start discovery-service first, then each service with the local profile (demo values only), e.g.:
+cd discovery-service; mvn spring-boot:run
+cd ..\auth-service;   mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+# ... same for responder-service, incident-service, notification-service, api-gateway
+```
+
+Always use JDK 17 for builds (`$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17..."`).
+
+---
+
+## 7. Try it (5-minute demo)
+
+Demo accounts: admin `admin` / `Admin@123` (seeded). Register your own user, e.g. `asha` / `Pass@1234`.
+
+```powershell
+$b = "http://localhost:8080"
+# 1. No token -> 401 from the gateway
+Invoke-WebRequest "$b/api/incidents" -UseBasicParsing        # (throws 401)
+# 2. Register, login
+Invoke-RestMethod -Method Post "$b/api/auth/register" -ContentType application/json -Body '{"username":"asha","password":"Pass@1234"}'
+$t = (Invoke-RestMethod -Method Post "$b/api/auth/login" -ContentType application/json -Body '{"username":"asha","password":"Pass@1234"}').token
+$h = @{ Authorization = "Bearer $t" }
+# 3. Report an incident -> 201, ASSIGNED, ambulance named
+Invoke-RestMethod -Method Post "$b/api/incidents" -Headers $h -ContentType application/json -Body '{"type":"MEDICAL","severity":"CRITICAL","description":"Person collapsed near library","locationText":"Main Library, Gate 2"}'
+# 4. Asynchronous event -> notification appears
+Invoke-RestMethod "$b/api/notifications" -Headers $h
+```
+
+Resilience demo:
+
+```powershell
+kubectl -n resqnet scale deploy/responder-service --replicas=0     # responder "crashes"
+# report another incident -> 201 with status PENDING; GET /api/responders -> 503; login and notifications still work
+kubectl -n resqnet scale deploy/responder-service --replicas=1     # it returns
+# as admin: POST /api/incidents/{id}/dispatch  -> ASSIGNED
+```
+
+Load balancing demo:
+
+```powershell
+kubectl -n resqnet get pods -l app=incident-service              # two pods
+.\scripts\load-test.ps1                                          # 20 users in parallel; shows which pod answered
+```
+
+### API at a glance (all via the gateway, prefix `/api`)
+
+| Endpoint | Who |
+|---|---|
+| `POST /auth/register`, `POST /auth/login` | public |
+| `GET /auth/me` | any logged-in user |
+| `POST /incidents`, `GET /incidents`, `GET /incidents/{id}` | USER (own incidents) / ADMIN (all) |
+| `POST /incidents/{id}/dispatch`, `POST /incidents/{id}/resolve` | ADMIN only |
+| `GET /responders`, `GET /responders/{id}` | any logged-in user |
+| `GET /notifications`, `PATCH /notifications/{id}/read` | own (ADMIN: all) |
+| `GET /actuator/health` | public |
+
+Full details, payloads and error codes: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Responses use one JSON error format (`timestamp, status, error, code, message, path, details`).
+
+---
+
+## 8. Security model
+
+- Passwords are stored as **BCrypt** hashes; public registration always creates role `USER`.
+- The **gateway is the only place a JWT is verified** (HS256 signature, issuer, expiry). Services read the verified identity from `X-User-*` headers and apply role rules; they never parse tokens.
+- The gateway **removes client-sent `X-User-*` headers** (a forged `X-User-Role: ADMIN` is ignored).
+- Only `api-gateway` is exposed (NodePort); every other Service is `ClusterIP`. `/internal/**` is never routed (404).
+- **Demo secrets:** `k8s/01-secrets.yaml` and the `application-local.yml` files contain clearly labelled demo values for the lab. Never reuse them for anything real.
+
+Known limits: no refresh tokens or revocation, no HTTPS inside the cluster, no rate limiting, symmetric JWT key shared by auth-service and gateway.
+
+---
+
+## 9. Testing
+
+```powershell
+cd <service>; mvn test        # use JDK 17; Docker must be running (Testcontainers starts a throw-away Postgres)
+```
+
+| Service | Tests | What they cover |
+|---|---|---|
+| auth-service | 5 | duplicate username 409, wrong password 401, registration always USER |
+| api-gateway | 12 | missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, valid accepted, forged headers replaced |
+| responder-service | 4 | 10 concurrent assignments for 3 ambulances give exactly 3 distinct responders (verified to fail if the row lock is removed); idempotent assign; release rules |
+| incident-service | 19 | fallback to `PENDING` on 409 / connection refused / 3 s hang / HTTP 500, breaker opens, dispatch/resolve rules, access rules, events published |
+| notification-service | 9 | duplicate `eventId` creates one notification (also with 8 simultaneous copies), malformed events rejected, templates, access rules |
+
+Beyond unit tests, these were run against the real cluster: a 10-case security checklist (plus 9 extra checks), the resilience scenarios, pod-restart self-healing and persistence, RabbitMQ and notification outages, and the Eureka/load-balancing scenarios.
+
+Load test: `scripts/load-test.ps1` (see section 7). **Result of the first run (20 users x 25 rounds x 3 endpoints = 1,500 requests, through `kubectl port-forward`):** 1,419 returned 200 and 81 timed out after 30 s; 387 s total; requests to `/api/incidents` were shared exactly 50% / 50% by the two pods. During the run the cluster became unstable and every pod restarted once (kubelet restarts after failed probes; the kernel log also shows one Java process killed for exceeding its memory limit). After about two minutes all 9 pods were `1/1` again with data intact. This is **not yet a passing load test**: next steps are higher memory limits for the JVM pods (768 Mi), a lower heap share, and re-running the test (also from inside the cluster to rule out the port-forward tunnel as the bottleneck).
+
+**Honest notes from testing:** while one pod of a service is being deleted and replaced, a few requests can receive 503 until the registry and the gateway's cache notice (seconds). Retrying idempotent GET requests at the gateway is a planned improvement.
+
+---
+
+## 10. Documentation map
+
+| File | Content |
+|---|---|
+| [`docs/PRD.md`](docs/PRD.md) | scope, user stories, acceptance criteria |
+| [`docs/Architecture.md`](docs/Architecture.md) | services, flows, deployment, decisions |
+| [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | endpoints, payloads, status codes, events (highest authority) |
+| [`docs/schema.md`](docs/schema.md) | tables, enums, state machines |
+| [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
+| [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
+| [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
+| [`AGENTS.md`](AGENTS.md) | conventions for AI coding agents |
+
+---
+
+## 11. Project status and what is left
+
+Done: all six services, Docker images, Minikube deployment, events, resilience, security, service discovery, load balancing, 49 passing tests.
+
+Still to do (tracked in `docs/tracker.md`):
+- `scripts/smoke-test.ps1`, `scripts/demo-resilience.ps1`, `scripts/verify-references.ps1` and the Postman collection
+- fix the load-test instability (memory limits) and re-run it until it passes\n- gateway retry for idempotent GETs (smoother failover: a 25 s test that deleted one incident pod saw 6 x HTTP 503 and one timeout before the registry caught up)
+- `docs/TEST_REPORT.md`, viva script, quick revision sheet, demo script, six diagrams
+- a public or lab URL for the "Deployed" row (needs a tunnel tool or LAN exposure, which requires the owner's approval)
+- two full demo rehearsals from a clean cluster

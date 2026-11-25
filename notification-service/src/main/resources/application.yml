@@ -36,3 +36,15 @@ management:
         readiness:
           include: readinessState,db   # ready = database reachable. The broker is deliberately not included,
                                        # so a RabbitMQ outage does not make GET /notifications unavailable.
+
+# Service discovery (Eureka). Each service registers itself and sends a heartbeat every 5 s;
+# if heartbeats stop for 15 s the registry removes it (graceful shutdowns de-register at once).
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}   # in Kubernetes: http://discovery-service:8761/eureka
+    registry-fetch-interval-seconds: 5      # how often this service refreshes its copy of the registry
+  instance:
+    prefer-ip-address: true                 # register the pod IP (pod names are not resolvable by other pods)
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15

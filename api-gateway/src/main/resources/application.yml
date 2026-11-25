@@ -7,14 +7,6 @@ spring:
   application:
     name: api-gateway
 
-# Downstream service URLs: Kubernetes DNS names in the cluster, localhost for local runs
-resqnet:
-  services:
-    auth-url: ${AUTH_SERVICE_URL}
-    incident-url: ${INCIDENT_SERVICE_URL}
-    responder-url: ${RESPONDER_SERVICE_URL}
-    notification-url: ${NOTIFICATION_SERVICE_URL}
-
 jwt:
   secret: ${JWT_SECRET}            # same value as auth-service; at least 32 characters; no default on purpose
   issuer: ${JWT_ISSUER:resqnet-auth}
@@ -28,3 +20,17 @@ management:
     health:
       probes:
         enabled: true      # /actuator/health/liveness and /readiness
+
+# Service discovery (Eureka). Each service registers itself and sends a heartbeat every 5 s;
+# if heartbeats stop for 15 s the registry removes it (graceful shutdowns de-register at once).
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}   # in Kubernetes: http://discovery-service:8761/eureka
+    registry-fetch-interval-seconds: 5      # how often this service refreshes its copy of the registry
+  instance:
+    prefer-ip-address: true                 # register the pod IP (pod names are not resolvable by other pods)
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+# Spring Cloud LoadBalancer keeps a copy of the instance list; refresh it quickly so scale up/down is noticed.
+spring.cloud.loadbalancer.cache.ttl: 5s

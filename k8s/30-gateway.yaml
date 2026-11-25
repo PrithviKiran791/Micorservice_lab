@@ -21,16 +21,10 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            - name: EUREKA_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: EUREKA_URL } }
             - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
               value: "-XX:MaxRAMPercentage=70"
-            - name: AUTH_SERVICE_URL
-              valueFrom: { configMapKeyRef: { name: resqnet-config, key: AUTH_SERVICE_URL } }
-            - name: INCIDENT_SERVICE_URL
-              valueFrom: { configMapKeyRef: { name: resqnet-config, key: INCIDENT_SERVICE_URL } }
-            - name: RESPONDER_SERVICE_URL
-              valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
-            - name: NOTIFICATION_SERVICE_URL
-              valueFrom: { configMapKeyRef: { name: resqnet-config, key: NOTIFICATION_SERVICE_URL } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: resqnet-secrets, key: JWT_SECRET } }
             - name: JWT_ISSUER

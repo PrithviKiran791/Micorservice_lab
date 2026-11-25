@@ -1,11 +1,5 @@
 # Local development values (DEMO ONLY, never real secrets). Activate with:
 #   mvn spring-boot:run "-Dspring-boot.run.profiles=local"
-resqnet:
-  services:
-    auth-url: http://localhost:8081
-    incident-url: http://localhost:8082
-    responder-url: http://localhost:8083
-    notification-url: http://localhost:8084
-
+# Downstream services are found through Eureka (run discovery-service first), so no URLs are needed here.
 jwt:
   secret: demo-only-secret-change-me-0123456789abcdef   # must equal auth-service's local secret

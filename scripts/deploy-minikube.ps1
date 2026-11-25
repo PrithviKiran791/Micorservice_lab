@@ -21,6 +21,7 @@ $ns = 'resqnet'
 
 # service folder -> manifest file. A service is deployed only when its manifest exists.
 $manifests = [ordered]@{
+    'discovery-service'    = '15-discovery.yaml'
     'auth-service'         = '20-auth.yaml'
     'incident-service'     = '21-incident.yaml'
     'responder-service'    = '22-responder.yaml'

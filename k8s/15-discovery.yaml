@@ -1,0 +1,53 @@
+# discovery-service: the Eureka registry ("phone book"). Services register here and the gateway / incident-service
+# look other services up by name. No database. Dashboard: kubectl -n resqnet port-forward svc/discovery-service 8761:8761
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-service
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery-service
+  template:
+    metadata:
+      labels:
+        app: discovery-service
+    spec:
+      containers:
+        - name: discovery-service
+          image: resqnet/discovery-service:1.0
+          imagePullPolicy: IfNotPresent      # images are loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 8761
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70"
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8761 }
+            periodSeconds: 5
+            failureThreshold: 40
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8761 }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8761 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-service
+  namespace: resqnet
+spec:
+  selector:
+    app: discovery-service
+  ports:
+    - port: 8761
+      targetPort: 8761

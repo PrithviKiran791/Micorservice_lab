@@ -9,9 +9,9 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 4 done (all 7 pods Ready, events + resilience + restarts verified in Minikube); next Phase 5 |
-| Next action | Phase 5: smoke-test.ps1, demo-resilience.ps1, verify-references.ps1, Postman collection, two clean-cluster runs |
-| Blockers | None (GitHub push awaiting authorization) |
+| Phase | Rubric widened to 8 rows: Eureka + load balancing added; load test not passing yet; Phase 5 scripts/Postman/docs still to do |
+| Next action | Raise JVM pod memory limits, re-run scripts/load-test.ps1 (also from inside the cluster); gateway GET retry; then Phase 5 |
+| Blockers | Public/lab URL for the "Deployed" row needs the owner approval (tunnel tool or LAN exposure) |
 | Last updated | 25 Nov 2026 |
 
 ## Rubric tracker (20 marks)
@@ -137,6 +137,10 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Readiness = database only (no RabbitMQ) in incident and notification services | A broker outage must not make incident-service unready (R-MQ-4: incident still saved, 201); a stricter reading of R-RS-4 would take it out of the Service |
 | 25 Nov 2026 | Failed messages are dropped (default-requeue-rejected=false), no dead-letter queue yet | Avoids an endless redelivery loop on a bad message; DLQ is a stretch item |
 | 25 Nov 2026 | Dispatch publishes incident.assigned only when it succeeds; a failed retry publishes nothing | Avoids repeating the "waiting for a responder" notification |
+| 25 Nov 2026 | **Rubric is 8 rows (photo of the lab slide in Documents/), not 5**: adds Handles traffic (load test + load balancing), Service discovery (Eureka) and Testing; Deployed means a public or lab URL | User confirmed "All 8 rows" |
+| 25 Nov 2026 | Added discovery-service (Eureka); gateway routes use lb://<name>; incident-service uses a @LoadBalanced RestClient; Spring Cloud BOM back in all poms; Resilience4j version now managed by the BOM | Rubric row "Eureka and one gateway entry point". Supersedes D3 (no Eureka) and rule R-AR-6 (Kubernetes DNS only) |
+| 25 Nov 2026 | incident-service runs 2 replicas; every service adds an X-Served-By response header (pod name) | Load-balancing evidence |
+| 25 Nov 2026 | Incident tests use a plain RestClient bean pointed at the fake responder (not the Eureka-backed one) | SimpleDiscoveryClient did not resolve the stub in tests; the Eureka path is verified in the cluster instead |
 
 ## Work log
 
@@ -151,6 +155,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Walking skeleton: Dockerfiles, k8s 00-22 + 30, scripts/deploy-minikube.ps1. Fresh namespace -> 6 pods 1/1, 0 restarts. Via port-forward: 401 no token, register/login, MEDICAL ASSIGNED, USER dispatch 403; scale responder to 0 -> PENDING (~1 s first call, then ~40 ms), /api/responders 503, login + list OK; scale to 1 -> dispatch ASSIGNED; deleted Postgres pod -> data kept (3 incidents before/after), auth readiness dipped to 0/1 then recovered. `\l` in the postgres pod shows the 4 databases | Done |
 | 25 Nov 2026 | Claude | Phase 3: incident-service publishes events (19/19 tests), notification-service built (9/9 tests, incl. 8 concurrent copies of one event -> 1 row, malformed -> rejected). Local run with RabbitMQ: notification appears, duplicate eventId ignored, malformed dropped, notifications-down -> events wait then delivered | Done |
 | 25 Nov 2026 | Claude | Phase 4 in Minikube (fresh namespace, full deploy script, exit 0): 7 pods 1/1, 0 restarts. ASSIGNED + notification; duplicate event -> 1 notification; malformed x2 -> queue 0; notification-service scaled to 0 -> rabbitmqctl shows 2 messages / 0 consumers, GET /api/notifications 503, after scale 1 -> 4 notifications, queue 0; responder down -> PENDING + pending notification, dispatch -> assigned notification; RabbitMQ down -> incident still 201 in 58 ms (event lost, trade-off D7); deleted incident/auth/notification/responder/gateway pods -> all recreated, data kept, old JWT still valid; auth checklist 10 cases + 9 extra = 19/19 PASS; only api-gateway is NodePort, all else ClusterIP | Done |
+| 25 Nov 2026 | Claude | Eureka in Minikube (9 pods, fresh deploy): registry lists api-gateway, auth, incident x2, responder, notification (all UP); incident+gateway flow OK; 10 calls split 6/4 over the two incident pods; responder scaled to 0 -> removed from registry, incident PENDING in 57 ms, /api/responders 503, login/list OK; scaled to 1 -> dispatch ASSIGNED within 1 s of polling. incident 19/19, auth 5/5, responder 4/4, notification 9/9 tests still pass | Done |
+| 25 Nov 2026 | Claude | Failover: deleting one incident pod during 25 s of calls gave HTTP 200 x10, 503 x6, timeout x1 (stale registry/cache for a few seconds). Load test 1,500 requests: 1,419 OK, 81 timeouts, 50/50 split over 2 incident pods, 4 req/s; all 9 pods restarted once during the run (exit 143 from failed probes; one JVM OOM-killed in the kernel log); recovered by themselves in ~2 min. Pods idle at ~320 of 512 Mi | **Open: load test not passing** |
 
 ## Command cheat sheet (demo day)
 

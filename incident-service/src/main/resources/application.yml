@@ -20,10 +20,10 @@ spring:
   rabbitmq:
     connection-timeout: 2s      # a dead broker must not stall incident creation
 
-# The synchronous dependency: responder-service (Kubernetes DNS name in the cluster)
+# The synchronous dependency: responder-service, found BY NAME through Eureka (see config/RestClientConfig).
 responder:
   service:
-    url: ${RESPONDER_SERVICE_URL}
+    url: ${RESPONDER_SERVICE_URL:http://responder-service}   # "responder-service" is a registry name, not a DNS host
     connect-timeout-ms: 1000    # rule R-RS-1: connect <= 1 s
     read-timeout-ms: 2000       # rule R-RS-1: read <= 2 s
 
@@ -57,3 +57,17 @@ management:
       group:
         readiness:
           include: readinessState,db   # not Ready until the database answers (R-RS-4)
+
+# Service discovery (Eureka). Each service registers itself and sends a heartbeat every 5 s;
+# if heartbeats stop for 15 s the registry removes it (graceful shutdowns de-register at once).
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}   # in Kubernetes: http://discovery-service:8761/eureka
+    registry-fetch-interval-seconds: 5      # how often this service refreshes its copy of the registry
+  instance:
+    prefer-ip-address: true                 # register the pod IP (pod names are not resolvable by other pods)
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+# Spring Cloud LoadBalancer keeps a copy of the instance list; refresh it quickly so scale up/down is noticed.
+spring.cloud.loadbalancer.cache.ttl: 5s

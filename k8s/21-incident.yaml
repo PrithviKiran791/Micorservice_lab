@@ -5,7 +5,7 @@ metadata:
   name: incident-service
   namespace: resqnet
 spec:
-  replicas: 1
+  replicas: 2                        # two copies: the gateway shares requests between them (load-balancing demo)
   selector:
     matchLabels:
       app: incident-service
@@ -27,6 +27,10 @@ spec:
           ports:
             - containerPort: 8082
           env:
+            - name: EUREKA_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: EUREKA_URL } }
+            - name: RESPONDER_SERVICE_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
             - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
               value: "-XX:MaxRAMPercentage=70"
             - name: SPRING_DATASOURCE_URL
@@ -35,8 +39,6 @@ spec:
               value: "incident_user"
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom: { secretKeyRef: { name: resqnet-secrets, key: INCIDENT_DB_PASSWORD } }
-            - name: RESPONDER_SERVICE_URL
-              valueFrom: { configMapKeyRef: { name: resqnet-config, key: RESPONDER_SERVICE_URL } }
             - name: SPRING_RABBITMQ_HOST
               valueFrom: { configMapKeyRef: { name: resqnet-config, key: SPRING_RABBITMQ_HOST } }
             - name: SPRING_RABBITMQ_PORT

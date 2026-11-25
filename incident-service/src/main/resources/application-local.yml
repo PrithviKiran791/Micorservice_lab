@@ -5,7 +5,3 @@ spring:
     url: jdbc:postgresql://localhost:5433/incident_db   # 5433 = docker-compose port mapping
     username: incident_user
     password: incident-demo
-
-responder:
-  service:
-    url: http://localhost:8083

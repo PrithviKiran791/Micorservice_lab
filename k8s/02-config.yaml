@@ -7,10 +7,8 @@ metadata:
 data:
   JWT_ISSUER: "resqnet-auth"
   JWT_EXPIRY_MINUTES: "120"
-  AUTH_SERVICE_URL: "http://auth-service:8081"
-  INCIDENT_SERVICE_URL: "http://incident-service:8082"
-  RESPONDER_SERVICE_URL: "http://responder-service:8083"
-  NOTIFICATION_SERVICE_URL: "http://notification-service:8084"
+  EUREKA_URL: "http://discovery-service:8761/eureka"        # the registry; every service registers here and looks others up by name
+  RESPONDER_SERVICE_URL: "http://responder-service"          # a registry NAME (resolved by Eureka + load balancer), not a DNS host
   SPRING_RABBITMQ_HOST: "rabbitmq"
   SPRING_RABBITMQ_PORT: "5672"
 ---

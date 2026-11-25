@@ -31,6 +31,8 @@ spec:
           ports:
             - containerPort: 8084
           env:
+            - name: EUREKA_URL
+              valueFrom: { configMapKeyRef: { name: resqnet-config, key: EUREKA_URL } }
             - name: JAVA_TOOL_OPTIONS         # cap the JVM heap so everything fits in the cluster (R-K8-6)
               value: "-XX:MaxRAMPercentage=70"
             - name: SPRING_DATASOURCE_URL
