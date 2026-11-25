@@ -1,5 +1,30 @@
+# api-gateway configuration. Routes themselves are defined in Java (config/GatewayRoutes.java).
+# For local runs use the "local" profile (application-local.yml), which holds DEMO values only.
 server:
   port: ${SERVER_PORT:8080}
+
 spring:
   application:
     name: api-gateway
+
+# Downstream service URLs: Kubernetes DNS names in the cluster, localhost for local runs
+resqnet:
+  services:
+    auth-url: ${AUTH_SERVICE_URL}
+    incident-url: ${INCIDENT_SERVICE_URL}
+    responder-url: ${RESPONDER_SERVICE_URL}
+    notification-url: ${NOTIFICATION_SERVICE_URL}
+
+jwt:
+  secret: ${JWT_SECRET}            # same value as auth-service; at least 32 characters; no default on purpose
+  issuer: ${JWT_ISSUER:resqnet-auth}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true      # /actuator/health/liveness and /readiness

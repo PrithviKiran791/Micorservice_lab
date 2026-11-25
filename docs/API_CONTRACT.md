@@ -33,6 +33,8 @@ The gateway removes the `/api` prefix (`StripPrefix=1`). Document paths below ar
 
 `X-User-Id`, `X-User-Name`, `X-User-Role`. See `docs/AUTHENTICATION.md`.
 
+The gateway also sets `X-Gateway-Prefix: /api` on routed requests so a service's error body can report the public path the client called (`path` field).
+
 ## 2. Standard error body
 
 ```json

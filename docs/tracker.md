@@ -9,8 +9,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 0 done; starting Phase 1 |
-| Next action | Phase 1: docker-compose, auth-service, gateway JWT filter |
+| Phase | 1 done except Actuator probes in remaining services; next Phase 2 |
+| Next action | Phase 2: responder-service, incident-service (circuit breaker) |
 | Blockers | None (GitHub push awaiting authorization) |
 | Last updated | 25 Nov 2026 |
 
@@ -40,12 +40,12 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 1 - Foundation (Hours 0-4)
 
-- [ ] `docker-compose.yml`: Postgres (4 databases/users via init script) + RabbitMQ; `docker compose up -d` works
-- [ ] **auth-service**: User entity, register, login (BCrypt), JWT issuing, `/auth/me`, admin seed
-- [ ] **auth-service** verified with Postman (register, login, duplicate user, wrong password)
-- [ ] **api-gateway**: Java `RouteLocator` with 4 routes (`StripPrefix=1`)
-- [ ] **api-gateway**: `JwtAuthenticationFilter` (public paths, strip headers, validate, add `X-User-*`, 401 JSON)
-- [ ] Gateway test: no token -> 401; valid token -> reaches auth-service `/auth/me`
+- [x] `docker-compose.yml`: Postgres (4 databases/users via init script) + RabbitMQ; `docker compose up -d` works
+- [x] **auth-service**: User entity, register, login (BCrypt), JWT issuing, `/auth/me`, admin seed
+- [x] **auth-service** verified with curl/PowerShell (Postman collection comes in Phase 5) (register, login, duplicate user, wrong password)
+- [x] **api-gateway**: Java `RouteLocator` with 4 routes (`StripPrefix=1`)
+- [x] **api-gateway**: `JwtAuthenticationFilter` (public paths, strip headers, validate, add `X-User-*`, 401 JSON)
+- [x] Gateway test: no token -> 401; valid token -> reaches auth-service `/auth/me`
 - [ ] Actuator health + probes enabled in all services
 
 ## Phase 2 - Core dispatch (Hours 4-8)
@@ -126,6 +126,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Docs copied to docs/, AGENTS.md to repo root; Documents/ kept | Docs reference docs/ paths |
 | 25 Nov 2026 | Compose maps Postgres to host port 5433 | Host port 5432 used by a local Windows Postgres |
 | 25 Nov 2026 | Builds run with JAVA_HOME set to JDK 17 per command | Default java on PATH is 25 |
+| 25 Nov 2026 | Business services set JVM default timezone to UTC in main() | JVM zone "Asia/Calcutta" is rejected by PostgreSQL; also satisfies R-CD-8 |
+| 25 Nov 2026 | Gateway sets `X-Gateway-Prefix: /api`; service errors use it for `path` | Contract shows public paths in error bodies; X-Forwarded-Prefix is overwritten by the gateway's own filter |
 
 ## Work log
 
@@ -135,6 +137,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | me | Installed WSL2 + Ubuntu | OK |
 | 25 Nov 2026 | me | Docker Desktop installed; engine running | OK |
 | 25 Nov 2026 | Claude | Preflight; 5 Maven skeletons; `mvn clean compile` passes on JDK 17 for all 5 | Done |
+| 25 Nov 2026 | Claude | Phase 1: compose (Postgres 4 DBs + RabbitMQ), auth-service, gateway routes + JWT filter. auth 5/5 tests, gateway 12/12 tests; live checks through gateway: 401 no/garbage/wrong-secret token, 201/409/400 register, 401 login, /me, forged header ignored, /internal 404, unrouted-service 503 | Done |
 
 ## Command cheat sheet (demo day)
 

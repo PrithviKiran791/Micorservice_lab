@@ -1,5 +1,34 @@
+# auth-service configuration. Everything comes from environment variables.
+# For local runs use the "local" profile (application-local.yml), which holds DEMO values only.
 server:
   port: ${SERVER_PORT:8081}
+
 spring:
   application:
     name: auth-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update     # dev/lab only (rule R-DB-1); Flyway is future work
+    open-in-view: false
+
+jwt:
+  secret: ${JWT_SECRET}                    # at least 32 characters, no default on purpose (R-SE-6)
+  issuer: ${JWT_ISSUER:resqnet-auth}
+  expiry-minutes: ${JWT_EXPIRY_MINUTES:120}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true      # adds /actuator/health/liveness and /readiness
+      group:
+        readiness:
+          include: readinessState,db   # not Ready until the database answers (R-RS-4)
