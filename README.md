@@ -254,11 +254,19 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 
 ## 11. Project status and what is left
 
-Done: all six services, Docker images, Minikube deployment, events, resilience, security, service discovery, load balancing, 49 passing tests.
+**Rehearsal result:** `scripts\rehearsal.ps1` deletes the namespace, deploys, and runs the smoke test (32 checks), the resilience demo (16 checks), the Postman collection with newman (43 assertions), the load test and the code-reference check. It **passed twice in a row from a clean cluster**, with every pod at 0 restarts (logs in `docs/evidence/`).
+
+| Script | Purpose |
+|---|---|
+| `scripts/deploy-minikube.ps1` | build jars and images, load them into Minikube, apply `k8s/`, wait for Ready |
+| `scripts/smoke-test.ps1` | health, security, register/login, incident, notification, roles, validation (PASS/FAIL per step, exit code) |
+| `scripts/demo-resilience.ps1` | scale responder-service to 0 and back; the rest keeps answering |
+| `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
+| `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
+| `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 
 Still to do (tracked in `docs/tracker.md`):
-- `scripts/smoke-test.ps1`, `scripts/demo-resilience.ps1`, `scripts/verify-references.ps1` and the Postman collection
-- fix the load-test instability (memory limits) and re-run it until it passes\n- gateway retry for idempotent GETs (smoother failover: a 25 s test that deleted one incident pod saw 6 x HTTP 503 and one timeout before the registry caught up)
-- `docs/TEST_REPORT.md`, viva script, quick revision sheet, demo script, six diagrams
+- viva script, quick revision sheet, demo script, `docs/TEST_REPORT.md` and the six diagrams (the code-reference table in `docs/viva/CODE_REFERENCES.md` is already generated)
+- gateway retry for idempotent GETs (a 25 s test that deleted one incident pod saw 6 x HTTP 503 and one timeout before the registry caught up)
 - a public or lab URL for the "Deployed" row (needs a tunnel tool or LAN exposure, which requires the owner's approval)
-- two full demo rehearsals from a clean cluster
+- the optional admin endpoints for responders (create, set OFFLINE) were not built
