@@ -1,0 +1,8 @@
+# mvn -B clean test in api-gateway (JDK 17), 25 Nov 2026 15:42
+[INFO] Building api-gateway 1.0
+[INFO] Running com.resqnet.gateway.config.GatewayRetryTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.42 s -- in com.resqnet.gateway.config.GatewayRetryTest
+[INFO] Running com.resqnet.gateway.security.JwtAuthenticationFilterTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.105 s -- in com.resqnet.gateway.security.JwtAuthenticationFilterTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS

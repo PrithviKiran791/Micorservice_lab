@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant G as api-gateway
+    participant I as incident-service
+    participant CB as Circuit breaker + fallback
+    participant R as responder-service (DOWN)
+    participant DB as incident_db
+    participant MQ as RabbitMQ
+    C->>G: POST /api/incidents
+    G->>I: POST /incidents
+    I->>DB: INSERT incident, status REPORTED (commit)
+    I->>CB: assign(incident)
+    CB-xR: call fails: connection refused / 2 s timeout / HTTP 5xx / breaker OPEN
+    CB-->>I: fallback returns "no responder"
+    I->>DB: UPDATE status PENDING (commit)
+    I-)MQ: publish incident.pending
+    I-->>G: 201 PENDING (fast, no error)
+    G-->>C: 201 PENDING
+    Note over C,MQ: login, listing incidents and notifications keep working - only /api/responders answers 503
+    Note over I,R: later: admin calls POST /api/incidents/ID/dispatch (the same assign call) and the status becomes ASSIGNED

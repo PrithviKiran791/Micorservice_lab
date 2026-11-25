@@ -85,3 +85,13 @@ function Wait-PodReady([string]$App, [int]$TimeoutSec = 180) {
     kubectl -n $script:Namespace wait --for=condition=Ready pod -l app=$App --timeout="${TimeoutSec}s" 2>&1 | Out-Null
     return ($LASTEXITCODE -eq 0)
 }
+
+# ---- hand-made JWTs (used to prove the gateway rejects forged / expired tokens) ---------------------------
+function ConvertTo-Base64Url([byte[]]$bytes) { [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_') }
+function New-TestJwt([string]$Secret, [long]$ExpiresAtEpoch, [string]$Issuer = 'resqnet-auth', [string]$Role = 'ADMIN') {
+    $hdr = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes('{"alg":"HS256","typ":"JWT"}'))
+    $pl = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes("{`"iss`":`"$Issuer`",`"sub`":`"1`",`"username`":`"admin`",`"role`":`"$Role`",`"iat`":$($ExpiresAtEpoch - 7200),`"exp`":$ExpiresAtEpoch}"))
+    $h = New-Object Security.Cryptography.HMACSHA256
+    $h.Key = [Text.Encoding]::UTF8.GetBytes($Secret)
+    return "$hdr.$pl." + (ConvertTo-Base64Url ($h.ComputeHash([Text.Encoding]::UTF8.GetBytes("$hdr.$pl"))))
+}

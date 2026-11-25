@@ -9,20 +9,23 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 | Item | Value |
 |---|---|
-| Phase | 5 done + gateway GET retry done; next Phase 6 docs/diagrams (viva, demo script, TEST_REPORT, 6 diagrams) |
-| Next action | Phase 6: VIVA_SCRIPT, QUICK_REVISION, DEMO_SCRIPT, TEST_REPORT, 6 diagrams; public/lab URL needs owner approval |
+| Phase | 6 done and Phase 7 final rehearsal PASSED (rebuild from source, clean cluster); open: public/lab URL decision |
+| Next action | Owner decision on a public/lab URL for the "Deployed" row; owner checks the items under "NOT independently verified" in docs/TEST_REPORT.md |
 | Blockers | Public/lab URL for the "Deployed" row needs the owner approval (tunnel tool or LAN exposure) |
 | Last updated | 25 Nov 2026 |
 
-## Rubric tracker (20 marks)
+## Rubric tracker (8 criteria on the lab slide, photo in Documents/)
 
-| Criterion | Marks | Evidence needed | Status |
-|---|---|---|---|
-| Deployment | 5 | All services + Postgres + RabbitMQ `Running` on Minikube; gateway reachable | [ ] |
-| Database | 4 | 4 databases, 4 users; each service only uses its own | [ ] |
-| Cross-service communication | 4 | REST call incident -> responder AND RabbitMQ event -> notification | [ ] |
-| Resilience | 4 | Scale responder-service to 0: incident returns `PENDING`, login/notifications still work | [ ] |
-| Security | 3 | No token -> 401 at gateway; USER on admin endpoint -> 403 | [ ] |
+| Criterion | Evidence needed | Status |
+|---|---|---|
+| Deployed | Every service on a cluster, reachable from a public or lab URL | [~] All 9 pods Running on Minikube, reachable via `kubectl port-forward` on the laptop; **no public/lab URL yet (needs owner approval)** |
+| Handles traffic | Load test by multiple users, demonstrating load balancing | [x] `scripts/load-test.ps1`: 20 users, 1,500 requests all 200, 50/50 over 2 incident pods; `scripts/demo-failover.ps1` |
+| Database | Each service has its own database | [x] 4 databases, 4 users, `incident_user` cannot connect to `auth_db` |
+| Cross-service communication | One synchronous call and one asynchronous event | [x] REST incident -> responder; RabbitMQ event -> notification |
+| Resilience | One service down while others still answer | [x] `scripts/demo-resilience.ps1` (16/16) |
+| Service discovery and gateway | Eureka and one gateway entry point | [x] discovery-service (Eureka) + api-gateway with `lb://` routes |
+| Security | Authentication checked at the gateway | [x] 401 / 403 / forged and expired token checks in the smoke test |
+| Testing | JUnit tests per service, documented | [x] 51 tests; `docs/TEST_REPORT.md` |
 
 ## Phase 0 - Environment (do before Hour 0)
 
@@ -165,6 +168,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Phase 5 rehearsal run attempt 1 FAILED at deploy (8+ min, pods killed by the 200 s startup probe; Windows memory exhausted, JVM steps taking 30-80 s); also found my runner swallowed child output. Fixed (lighter JVM flags, probe 450 s, deploy wait 900 s, Out-Host). **Run 1 PASS** (deploy 90 s, smoke 32/32, resilience 16/16, newman 43/43, load 1500x200 at 146 req/s p95 271 ms 50/50 split, references 40/40); **run 2 PASS** (deploy 104 s, same checks, load 127 req/s p95 295 ms); all 9 pods 0 restarts | Done |
 | 25 Nov 2026 | Claude | Gateway retry. Before (old gateway): deleting one incident pod under traffic -> 9 of 32 GETs failed (eight 503 + one 30 s hang). After: 114 of 114 GETs returned 200, slowest 1.08 s (first attempt with a 2 s connect timeout: 107/107 OK but slowest 2.09 s, so the timeout was lowered to 1 s). Gateway tests 14/14 (new GatewayRetryTest: GETs succeed with one dead copy; POSTs not retried; fails without the retry config). My own script bug found on the way (PowerShell passed -split to kubectl) | Done |
 | 25 Nov 2026 | Claude | Rehearsal run 3 (with failover step) first attempt FAILED one check: GET /api/responders returned 503 right after dispatch worked (gateway registry copy lags up to ~13 s). Check now polls; passed after 3 s. **Run 3 PASS**: deploy 80 s, smoke 32/32, resilience 16/16, failover 7/7 (111/111 x 200, slowest 1.09 s), newman 43/43, load 1500 x 200 at 136 req/s p95 236 ms (50/50 split), references 43/43, 0 restarts | Done |
+| 25 Nov 2026 | Claude | Phase 7 final QA: `rehearsal.ps1 -Rebuild` from a deleted namespace PASSED (6 jars + 6 images rebuilt, deploy 258 s, smoke 37/37, resilience 16/16, failover 7/7, newman 43/43, load 1500 x 200 at 151 req/s p95 208 ms, 251/249 split, refs 43/43, 9 pods 0 restarts) | Done |
+| 25 Nov 2026 | Claude | Phase 6: wrote docs/viva/VIVA_SCRIPT.md, QUICK_REVISION.md, docs/demo/DEMO_SCRIPT.md, docs/TEST_REPORT.md; 6 Mermaid diagrams rendered to PNG with mermaid-cli (Edge as browser) and each PNG viewed (2 simplified after first render, 1 syntax error fixed); scripts/run-unit-tests.ps1 (51 tests PASS: auth 5, gateway 14, responder 4, incident 19, notification 9); scripts/verify-docs.ps1 (first run found 9 wrong references in my docs, fixed; final 236 correct / 0 wrong; negative test catches missing file, bad option, missing method, unknown k8s name); forged/expired/wrong-issuer token checks added to smoke-test.ps1 (now 37/37); DEMO_SCRIPT followed from the first line on the live cluster: all steps as documented | Done |
 
 ## Command cheat sheet (demo day)
 

@@ -1,0 +1,34 @@
+flowchart LR
+    client["Client<br/>Postman / PowerShell scripts"]
+    subgraph k8s["Minikube - namespace resqnet"]
+        gw["api-gateway :8080<br/>JWT check, routing (lb://), GET retry<br/>the ONLY service exposed"]
+        eureka["discovery-service :8761<br/>Eureka registry<br/>ALL services register here"]
+        auth["auth-service :8081"]
+        inc["incident-service :8082<br/>2 replicas"]
+        resp["responder-service :8083"]
+        notif["notification-service :8084"]
+        mq[("RabbitMQ<br/>exchange resqnet.events")]
+        subgraph pg["PostgreSQL - one server, 4 databases, 4 users"]
+            adb[("auth_db")]
+            idb[("incident_db")]
+            rdb[("responder_db")]
+            ndb[("notification_db")]
+        end
+    end
+    client -->|"HTTP + Bearer JWT"| gw
+    gw -->|"/api/auth/**"| auth
+    gw -->|"/api/incidents/**"| inc
+    gw -->|"/api/responders/**"| resp
+    gw -->|"/api/notifications/**"| notif
+    inc -->|"SYNC REST /internal/responders/assign<br/>circuit breaker + fallback"| resp
+    inc -.->|"ASYNC event incident.assigned / incident.pending"| mq
+    mq -.->|"queue notification.incidents"| notif
+    auth --- adb
+    inc --- idb
+    resp --- rdb
+    notif --- ndb
+    gw -. "register / look up by name" .-> eureka
+    inc -. "register / look up by name" .-> eureka
+    auth -.-> eureka
+    resp -.-> eureka
+    notif -.-> eureka

@@ -27,6 +27,17 @@ try {
     $r = Api GET '/api/incidents' $null 'garbage.token.value'; Check 'GET /api/incidents with a garbage token is rejected' ($r.Code -eq 401) "-> $($r.Code)"
     $r = Api POST '/internal/responders/assign' @{ incidentId = 1; incidentType = 'FIRE' } ; Check 'POST /internal/... is not routed by the gateway' ($r.Code -eq 401 -or $r.Code -eq 404) "-> $($r.Code)"
 
+    # Forged tokens. The demo JWT secret is read from the Kubernetes Secret (DEMO value from k8s/01-secrets.yaml).
+    $secretB64 = kubectl -n resqnet get secret resqnet-secrets -o jsonpath='{.data.JWT_SECRET}' 2>$null
+    if ($secretB64) {
+        $secret = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($secretB64))
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $r = Api GET '/api/incidents' $null (New-TestJwt 'another-secret-another-secret-0123456789' ($now + 3600)); Check 'token signed with a DIFFERENT secret is rejected' ($r.Code -eq 401) "-> $($r.Code)"
+        $r = Api GET '/api/incidents' $null (New-TestJwt $secret ($now - 60));                                      Check 'EXPIRED token (correct secret) is rejected' ($r.Code -eq 401) "-> $($r.Code)"
+        $r = Api GET '/api/incidents' $null (New-TestJwt $secret ($now + 3600) 'evil-issuer');                       Check 'token with the wrong issuer is rejected' ($r.Code -eq 401) "-> $($r.Code)"
+        $r = Api GET '/api/incidents' $null (New-TestJwt $secret ($now + 3600) 'resqnet-auth' 'SUPERUSER');          Check 'token with an unknown role is rejected' ($r.Code -eq 401) "-> $($r.Code)"
+        $r = Api GET '/api/incidents' $null (New-TestJwt $secret ($now + 3600));                                    Check 'control: a correctly signed, unexpired token is accepted' ($r.Code -eq 200) "-> $($r.Code)"
+    } else { Write-Host 'SKIP  forged-token checks (kubectl cannot read the JWT secret)' -ForegroundColor Yellow }
     Write-Section '2. Register and login'
     $user = New-TestUser 'smoke'
     $r = Api POST '/api/auth/register' $user;                Check 'register a new user' ($r.Code -eq 201 -and $r.Json.role -eq 'USER') "-> $($r.Code) role=$($r.Json.role)"

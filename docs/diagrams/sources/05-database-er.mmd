@@ -1,0 +1,48 @@
+erDiagram
+    USERS {
+        bigint id PK
+        varchar username UK
+        varchar password_hash "BCrypt"
+        varchar role "USER or ADMIN"
+        boolean enabled
+        timestamptz created_at
+    }
+    INCIDENTS {
+        bigint id PK
+        varchar incident_type
+        varchar severity
+        varchar status "REPORTED ASSIGNED PENDING RESOLVED"
+        varchar description
+        varchar location_text
+        bigint reported_by_user_id "logical ref to USERS.id"
+        varchar reported_by_username
+        bigint assigned_responder_id "logical ref to RESPONDERS.id"
+        varchar assigned_responder_name
+        varchar assigned_responder_type
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz resolved_at
+    }
+    RESPONDERS {
+        bigint id PK
+        varchar name UK
+        varchar responder_type
+        varchar status "AVAILABLE BUSY OFFLINE"
+        varchar zone
+        bigint current_incident_id "unique when set, logical ref to INCIDENTS.id"
+        timestamptz updated_at
+    }
+    NOTIFICATIONS {
+        bigint id PK
+        uuid event_id UK "idempotency key"
+        bigint user_id "logical ref to USERS.id"
+        bigint incident_id "logical ref to INCIDENTS.id"
+        varchar type
+        varchar message
+        boolean is_read
+        timestamptz created_at
+    }
+    USERS ||..o{ INCIDENTS : "reports (id only, no foreign key)"
+    RESPONDERS ||..o{ INCIDENTS : "assigned to (id only)"
+    INCIDENTS ||..o{ NOTIFICATIONS : "about (id only)"
+    USERS ||..o{ NOTIFICATIONS : "receives (id only)"

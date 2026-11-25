@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant G as api-gateway
+    participant I as incident-service
+    participant DB as incident_db
+    participant R as responder-service
+    participant RDB as responder_db
+    participant MQ as RabbitMQ
+    participant N as notification-service
+    C->>G: POST /api/incidents (Bearer JWT)
+    G->>G: verify JWT, strip forged X-User-* headers, add trusted ones
+    G->>I: POST /incidents (lb:// picks one incident-service copy)
+    I->>DB: INSERT incident, status REPORTED (commit)
+    I->>R: POST /internal/responders/assign (circuit breaker, 1 s connect / 2 s read)
+    R->>RDB: SELECT ... FOR UPDATE SKIP LOCKED, set BUSY (one transaction)
+    R-->>I: 200 responder Ambulance Alpha
+    I->>DB: UPDATE status ASSIGNED (commit)
+    I-)MQ: publish incident.assigned (fire and forget)
+    I-->>G: 201 ASSIGNED
+    G-->>C: 201 ASSIGNED + responder
+    MQ-)N: deliver event
+    N->>N: skip if eventId already stored, else INSERT notification

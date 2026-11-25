@@ -1,0 +1,15 @@
+flowchart LR
+    inc["incident-service<br/>IncidentEventPublisher"]
+    ex{{"topic exchange<br/>resqnet.events<br/>(durable)"}}
+    q[["queue notification.incidents<br/>binding incident.*  (durable)<br/><br/>If notification-service is down,<br/>messages wait here and are<br/>delivered when it returns"]]
+    lis["notification-service<br/>IncidentEventListener<br/>@RabbitListener"]
+    chk{"eventId already<br/>stored?"}
+    db[("notification_db<br/>notifications<br/>event_id UNIQUE")]
+    drop["reject, do not requeue<br/>(malformed message)"]
+    inc -->|"incident.assigned or<br/>incident.pending (JSON)"| ex
+    ex --> q
+    q -->|"at-least-once"| lis
+    lis --> chk
+    chk -->|"no: INSERT"| db
+    chk -->|"yes: acknowledge, skip"| lis
+    lis -->|"invalid event"| drop

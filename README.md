@@ -23,7 +23,7 @@ The lab slide lists eight criteria. Honest status of each:
 | **Resilience** | Scale `responder-service` to 0: incidents are still accepted (`PENDING`), login and notifications still work | Done and verified in the cluster |
 | **Service discovery and gateway** | **Eureka** registry + one **Spring Cloud Gateway** entry point routing by service name (`lb://...`) | Done and verified in the cluster |
 | **Security** | JWT checked **at the gateway**; 401 without a valid token, 403 for a USER on admin endpoints | Done and verified (19 checks) |
-| **Testing** | JUnit tests in every service | 49 automated tests pass. A formal test report (`docs/TEST_REPORT.md`) is still to be written. |
+| **Testing** | JUnit tests in every service | **Done.** 51 automated JUnit tests pass (`scripts/run-unit-tests.ps1`), plus scripts and Postman; every result is in [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) (application tests and script/document tests kept separate). |
 
 ---
 
@@ -63,6 +63,8 @@ The lab slide lists eight criteria. Honest status of each:
 | `responder-service` | 8083 | `responder_db` | Responder catalogue; **atomic** assignment and release |
 | `notification-service` | 8084 | `notification_db` | Consumes events, stores notifications, de-duplicates by `eventId` |
 | `discovery-service` | 8761 | none | Eureka service registry |
+
+![System architecture](docs/diagrams/01-system-architecture.png)
 
 ### Request flows
 
@@ -224,7 +226,7 @@ cd <service>; mvn test        # use JDK 17; Docker must be running (Testcontaine
 | Service | Tests | What they cover |
 |---|---|---|
 | auth-service | 5 | duplicate username 409, wrong password 401, registration always USER |
-| api-gateway | 12 | missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, valid accepted, forged headers replaced |
+| api-gateway | 14 | missing / garbage / expired / wrong-secret / wrong-issuer tokens rejected, valid accepted, forged headers replaced; GET retried on a healthy copy, POST never retried |
 | responder-service | 4 | 10 concurrent assignments for 3 ambulances give exactly 3 distinct responders (verified to fail if the row lock is removed); idempotent assign; release rules |
 | incident-service | 19 | fallback to `PENDING` on 409 / connection refused / 3 s hang / HTTP 500, breaker opens, dispatch/resolve rules, access rules, events published |
 | notification-service | 9 | duplicate `eventId` creates one notification (also with 8 simultaneous copies), malformed events rejected, templates, access rules |
@@ -248,13 +250,20 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
 | [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
 | [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
+| [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 34 likely questions with answers |
+| [`docs/viva/QUICK_REVISION.md`](docs/viva/QUICK_REVISION.md) | one-page revision sheet |
+| [`docs/viva/CODE_REFERENCES.md`](docs/viva/CODE_REFERENCES.md) | 43 generated file:line references, checked by `scripts/verify-references.ps1` |
+| [`docs/demo/DEMO_SCRIPT.md`](docs/demo/DEMO_SCRIPT.md) | timed 5-minute demo (what to type, what happens, what to say) |
+| [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) | all test results; Part A application, Part B scripts and documents, and a list of what was NOT independently verified |
+| `docs/diagrams/` | six diagrams as PNG with Mermaid sources in `docs/diagrams/sources/` (architecture, report-incident sequence, fallback sequence, event flow, database ER, Minikube deployment) |
+| `docs/evidence/` | raw logs: rehearsal runs, failover before/after, unit tests, documentation check |
 | [`AGENTS.md`](AGENTS.md) | conventions for AI coding agents |
 
 ---
 
 ## 11. Project status and what is left
 
-**Rehearsal result:** `scripts\rehearsal.ps1` deletes the namespace, deploys, and runs the smoke test (32 checks), the resilience demo (16 checks), the failover demo (7 checks), the Postman collection with newman (43 assertions), the load test and the code-reference check. It **passed twice in a row from a clean cluster**, and passed again after the gateway retry was added, now with the `demo-failover.ps1` step as well (8 steps, latest log `docs/evidence/rehearsal-run3.txt`); every pod ended with 0 restarts.
+**Rehearsal result:** `scripts\rehearsal.ps1` deletes the namespace, deploys, and runs the smoke test (37 checks), the resilience demo (16 checks), the failover demo (7 checks), the Postman collection with newman (43 assertions), the load test and the code-reference check. It **passed twice in a row from a clean cluster**, and passed again after the gateway retry was added, now with the `demo-failover.ps1` step as well (8 steps, latest log `docs/evidence/rehearsal-run3.txt`); every pod ended with 0 restarts.
 
 | Script | Purpose |
 |---|---|
@@ -264,9 +273,11 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | `scripts/demo-failover.ps1` | delete one of two incident-service pods under traffic; every GET must still return 200 |
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
+| `scripts/run-unit-tests.ps1` | all 51 JUnit tests with a summary table |
+| `scripts/verify-docs.ps1` | checks that every file, link, script option, class.method and Kubernetes name mentioned in the documents exists |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 
 Still to do (tracked in `docs/tracker.md`):
-- viva script, quick revision sheet, demo script, `docs/TEST_REPORT.md` and the six diagrams (the code-reference table in `docs/viva/CODE_REFERENCES.md` is already generated)
-- a public or lab URL for the "Deployed" row (needs a tunnel tool or LAN exposure, which requires the owner's approval)
+- a public or lab URL for the "Deployed" row (needs a tunnel tool or exposing the port on the lab network, which requires the owner's approval)
 - the optional admin endpoints for responders (create, set OFFLINE) were not built
+- a last full rehearsal on the evaluation machine (`.\scripts\rehearsal.ps1 -Rebuild`) and the owner's own check of the items listed under "NOT independently verified" in `docs/TEST_REPORT.md`
