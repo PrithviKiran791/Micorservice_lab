@@ -11,7 +11,7 @@ communicate in two ways: a **synchronous REST call** (incident -> responder) and
 ## 2. Component diagram
 
 ```text
-                 Postman / optional static page
+                 Web UI (React) / Postman
                               |
                               v
                  +------------------------+
@@ -172,6 +172,7 @@ Namespace `resqnet`. One manifest file per concern in `k8s/`:
 | `15-discovery.yaml` | discovery-service (Eureka) Deployment + Service (8761) |
 | `20-auth.yaml` ... `23-notification.yaml` | Deployment + ClusterIP Service per service |
 | `30-gateway.yaml` | Deployment + Service (NodePort 30080) |
+| `40-frontend.yaml` | web UI: Deployment (nginx) + ClusterIP Service `frontend`; the gateway routes every non-API GET to it (see docs/FRONTEND.md) |
 
 Per workload: image `resqnet/<service>:1.0` (`imagePullPolicy: IfNotPresent`), environment from
 ConfigMap/Secret, liveness `/actuator/health/liveness`, readiness `/actuator/health/readiness`,

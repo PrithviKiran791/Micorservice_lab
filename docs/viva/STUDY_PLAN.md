@@ -66,7 +66,7 @@ Open `docs/viva/VIVA_SCRIPT.md` section G. Cover the answers, read each question
 | "Delete a pod" | `kubectl -n resqnet delete pod <incident pod>`; or `.\scripts\demo-failover.ps1`; Kubernetes recreates it, GETs keep returning 200 |
 | "Show me the databases are separate" | `kubectl -n resqnet exec deploy/postgres -- psql -U postgres -c "\l"`; `db/init-databases.sh` (`REVOKE CONNECT`) |
 | "Is this really on Kubernetes?" | `kubectl -n resqnet get pods`, `kubectl -n resqnet get svc`; Minikube is a local Kubernetes cluster |
-| "Where are your tests?" | `.\scripts\run-unit-tests.ps1` (51 tests); `docs/TEST_REPORT.md` |
+| "Where are your tests?" | `.\scripts\run-unit-tests.ps1` (58 tests); `docs/TEST_REPORT.md` |
 | "A command fails live" | stay calm, run `.\scripts\demo-resilience.ps1` or `.\scripts\smoke-test.ps1`; they prove the same things with PASS/FAIL lines |
 
 ## F. Honest limits and last checks (15 min)

@@ -3,6 +3,8 @@ package com.resqnet.gateway.config;
 import org.springframework.cloud.gateway.route.builder.GatewayFilterSpec;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.Ordered;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,9 +39,25 @@ import java.util.concurrent.TimeoutException;
 @Configuration
 public class GatewayRoutes {
 
+    /** Id of the route that serves the web UI; the JWT filter lets exactly this route through without a token. */
+    public static final String FRONTEND_ROUTE_ID = "frontend";
+
+    /**
+     * The web UI (static files in an nginx pod). Default is the Kubernetes Service name "frontend".
+     * It is only a lowest-priority catch-all: anything under /api, /internal or /actuator is never sent to it.
+     */
+    @Value("${frontend.url:http://frontend}")
+    private String frontendUrl;
+
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
         return builder.routes()
+                // Web UI: every GET/HEAD path that is not an API, internal or actuator path. Evaluated last.
+                .route(FRONTEND_ROUTE_ID, r -> r.order(Ordered.LOWEST_PRECEDENCE)
+                        .method(HttpMethod.GET, HttpMethod.HEAD)
+                        .and().not(n -> n.path("/api/**", "/internal/**", "/actuator/**"))
+                        .filters(f -> f.setRequestHeader("X-Gateway-Prefix", "/"))
+                        .uri(frontendUrl))
                 .route("auth", r -> r.path("/api/auth/**")
                         .filters(this::standardFilters).uri("lb://auth-service"))
                 .route("incidents", r -> r.path("/api/incidents/**")

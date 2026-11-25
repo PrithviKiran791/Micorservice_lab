@@ -26,6 +26,7 @@ $manifests = [ordered]@{
     'incident-service'     = '21-incident.yaml'
     'responder-service'    = '22-responder.yaml'
     'notification-service' = '23-notification.yaml'
+    'frontend'             = '40-frontend.yaml'      # web UI: built by its own Dockerfile (npm), no Maven jar
     'api-gateway'          = '30-gateway.yaml'
 }
 $services = @($manifests.Keys | Where-Object { Test-Path (Join-Path $root "k8s\$($manifests[$_])") })
@@ -54,7 +55,7 @@ if (-not $SkipBuild) {
     $env:JAVA_HOME = $jdk
     $env:Path = "$jdk\bin;$env:Path"
     Write-Host "Using JDK: $jdk"
-    foreach ($s in $services) {
+    foreach ($s in ($services | Where-Object { $_ -ne 'frontend' })) {
         Write-Host "mvn package: $s"
         Push-Location (Join-Path $root $s)
         mvn -B -q clean package -DskipTests

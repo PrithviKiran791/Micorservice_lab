@@ -8,3 +8,6 @@ Documents/*.exe
 Documents/*.zip
 Micorservice_lab/
 tools/
+node_modules/
+dist/
+*.tsbuildinfo

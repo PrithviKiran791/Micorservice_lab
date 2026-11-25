@@ -8,7 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import com.resqnet.gateway.config.GatewayRoutes;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.cloud.gateway.route.Route;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -31,7 +34,7 @@ import java.util.Set;
  *
  * A GlobalFilter runs for every request that the gateway routes. This one, with highest priority:
  *  1. removes any X-User-* headers sent by the client (they could be forged),
- *  2. lets the public routes (register, login) through,
+ *  2. lets the public routes (register, login, and the web UI's static files) through,
  *  3. otherwise requires "Authorization: Bearer <jwt>", verifies signature, issuer and expiry,
  *  4. on success adds trusted X-User-Id / X-User-Name / X-User-Role headers for the services,
  *  5. on failure answers 401 right here; the request never reaches a service.
@@ -76,7 +79,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }).build();
 
         // Step 2: public routes need no token.
-        if (isPublic(request)) {
+        if (isPublic(exchange)) {
             return chain.filter(exchange.mutate().request(cleaned).build());
         }
 
@@ -112,7 +115,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     /** Only registration and login are public (health is served by the gateway itself, not routed). */
-    private boolean isPublic(ServerHttpRequest request) {
+    private boolean isPublic(ServerWebExchange exchange) {
+        // The web UI's static files (HTML/JS/CSS) must load before anybody can log in. Default deny: only the
+        // route that the gateway itself matched as "frontend" is open; an unmatched path is a 404 anyway.
+        Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+        if (route != null && GatewayRoutes.FRONTEND_ROUTE_ID.equals(route.getId())) {
+            return true;
+        }
+        ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().value();
         return HttpMethod.POST.equals(request.getMethod())
                 && ("/api/auth/register".equals(path) || "/api/auth/login".equals(path));

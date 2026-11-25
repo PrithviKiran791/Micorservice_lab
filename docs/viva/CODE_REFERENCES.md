@@ -33,10 +33,10 @@ Every row gives the file, the exact line number and the code snippet found there
 
 | Concept | File:line | Snippet | Class / method | Rubric row |
 |---|---|---|---|---|
-| Verify signature, issuer and expiry | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:92` | `Jwts.parser().verifyWith(key)` | JwtAuthenticationFilter.filter | Security |
-| Forged identity headers are removed | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:75` | `h.remove(HEADER_ROLE);` | JwtAuthenticationFilter.filter | Security |
-| The filter runs before everything else | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:64` | `return Ordered.HIGHEST_PRECEDENCE;` | JwtAuthenticationFilter.getOrder | Security |
-| Verified identity passed to the service | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:109` | `.header(HEADER_ROLE, role)` | JwtAuthenticationFilter.filter | Security |
+| Verify signature, issuer and expiry | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:95` | `Jwts.parser().verifyWith(key)` | JwtAuthenticationFilter.filter | Security |
+| Forged identity headers are removed | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:78` | `h.remove(HEADER_ROLE);` | JwtAuthenticationFilter.filter | Security |
+| The filter runs before everything else | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:67` | `return Ordered.HIGHEST_PRECEDENCE;` | JwtAuthenticationFilter.getOrder | Security |
+| Verified identity passed to the service | `api-gateway/src/main/java/com/resqnet/gateway/security/JwtAuthenticationFilter.java:112` | `.header(HEADER_ROLE, role)` | JwtAuthenticationFilter.filter | Security |
 | Services only read headers and check roles | `incident-service/src/main/java/com/resqnet/incident/security/CurrentUser.java:34` | `public void requireAdmin()` | CurrentUser.requireAdmin | Security |
 | Test: expired token is rejected | `api-gateway/src/test/java/com/resqnet/gateway/security/JwtAuthenticationFilterTest.java:81` | `void expiredTokenIsRejected()` | JwtAuthenticationFilterTest | Testing |
 | Login checks the BCrypt hash | `auth-service/src/main/java/com/resqnet/auth/service/AuthService.java:64` | `passwordEncoder.matches(request.password(), u.getPasswordHash())` | AuthService.login | Security |
@@ -47,10 +47,10 @@ Every row gives the file, the exact line number and the code snippet found there
 | Concept | File:line | Snippet | Class / method | Rubric row |
 |---|---|---|---|---|
 | The registry (Eureka server) | `discovery-service/src/main/java/com/resqnet/discovery/DiscoveryServiceApplication.java:12` | `@EnableEurekaServer` | DiscoveryServiceApplication | Service discovery |
-| Failed GET requests are retried on another copy (smooth failover) | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:60` | `.setMethods(HttpMethod.GET)` | GatewayRoutes.standardFilters | Handles traffic, Resilience |
+| Failed GET requests are retried on another copy (smooth failover) | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:78` | `.setMethods(HttpMethod.GET)` | GatewayRoutes.standardFilters | Handles traffic, Resilience |
 | Test: GETs succeed although one copy is dead; POSTs are never repeated | `api-gateway/src/test/java/com/resqnet/gateway/config/GatewayRetryTest.java:75` | `void getRequestsSucceedEvenThoughOneCopyIsDead()` | GatewayRetryTest | Testing |
 | Gateway gives up on a dead copy after 1 s | `api-gateway/src/main/resources/application.yml:40` | `connect-timeout: 1000` | application.yml (httpclient) | Resilience |
-| Gateway routes by service NAME, not address | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:46` | `.uri("lb://incident-service"))` | GatewayRoutes.routes | Service discovery, Handles traffic |
+| Gateway routes by service NAME, not address | `api-gateway/src/main/java/com/resqnet/gateway/config/GatewayRoutes.java:64` | `.uri("lb://incident-service"))` | GatewayRoutes.routes | Service discovery, Handles traffic |
 | incident-service finds responder-service by name | `incident-service/src/main/java/com/resqnet/incident/config/RestClientConfig.java:13` | `@LoadBalanced` | RestClientConfig.loadBalancedRestClientBuilder | Service discovery |
 | Every service registers with Eureka | `incident-service/src/main/resources/application.yml:66` | `defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}` | application.yml (eureka.client) | Service discovery |
 | Two copies of incident-service | `k8s/21-incident.yaml:8` | `replicas: 2` | Deployment incident-service | Handles traffic |
@@ -82,4 +82,4 @@ Every row gives the file, the exact line number and the code snippet found there
 | Wait for Postgres before starting (init container) | `k8s/22-responder.yaml:19` | `name: wait-for-postgres` | Deployment responder-service | Deployed |
 | Readiness probe: only receive traffic when healthy | `k8s/22-responder.yaml:51` | `readinessProbe:` | Deployment responder-service | Deployed |
 | Only the gateway is reachable from outside | `k8s/30-gateway.yaml:57` | `type: NodePort` | Service api-gateway | Deployed, Security |
-| Images are copied into Minikube (containerd runtime) | `scripts/deploy-minikube.ps1:76` | `minikube image load $image` | deploy-minikube.ps1 | Deployed |
+| Images are copied into Minikube (containerd runtime) | `scripts/deploy-minikube.ps1:77` | `minikube image load $image` | deploy-minikube.ps1 | Deployed |

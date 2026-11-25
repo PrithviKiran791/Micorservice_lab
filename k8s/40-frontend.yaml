@@ -1,0 +1,47 @@
+# frontend: the web UI (static files in nginx). ClusterIP only: browsers reach it THROUGH the api-gateway,
+# which forwards every non-/api path here. It has no database and no secrets.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: resqnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: resqnet/frontend:1.0
+          imagePullPolicy: IfNotPresent      # image is loaded into Minikube, never pulled (rule R-K8-2)
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet: { path: /healthz, port: 80 }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /healthz, port: 80 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { memory: 16Mi, cpu: 10m }
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: resqnet
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80

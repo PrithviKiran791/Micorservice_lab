@@ -16,7 +16,7 @@ The lab slide lists eight criteria. Honest status of each:
 
 | Criterion | What proves it | Status |
 |---|---|---|
-| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`), reachable from a public link | **Done (tunnel).** 10 pods on Minikube. `scripts/start-public-url.ps1` opens a temporary public HTTPS link (free Cloudflare quick tunnel) to the gateway; the full smoke test (37 checks) passed through that public link. It is a tunnel to the laptop, **not cloud hosting**: the link changes each time and works only while the laptop is on. |
+| **Deployed** | All services run as pods on Minikube (`kubectl -n resqnet get pods`), reachable from a public link | **Done (tunnel).** 11 pods on Minikube (10 backend + the web UI). `scripts/start-public-url.ps1` opens a temporary public HTTPS link (free Cloudflare quick tunnel) to the gateway; the full smoke test (37 checks) passed through that public link. It is a tunnel to the laptop, **not cloud hosting**: the link changes each time and works only while the laptop is on. |
 | **Handles traffic** | `scripts/load-test.ps1`: many users at once; two `incident-service` pods share the requests (round-robin through the gateway) | **Done.** `scripts/load-test.ps1`: 20 simultaneous users, 1,500 requests, all HTTP 200, about 130-150 requests/second, average 134-153 ms, p95 about 270-295 ms, and `/api/incidents` shared exactly 50% / 50% by the two `incident-service` pods (two clean-cluster runs). |
 | **Database** | One PostgreSQL server, **four databases, four users**; a user cannot even connect to another service's database | Done and verified |
 | **Cross-service communication** | **Synchronous:** incident-service calls responder-service (REST). **Asynchronous:** incident-service publishes events to RabbitMQ, notification-service consumes them | Done and verified |
@@ -104,6 +104,7 @@ RabbitMQ 3 (Spring AMQP) · Resilience4j · jjwt 0.12 · Maven · Docker · Kube
 ```text
 api-gateway/  auth-service/  incident-service/  responder-service/  notification-service/  discovery-service/
                           each: pom.xml, Dockerfile, src/main/java/com/resqnet/<name>/..., src/test/...
+frontend/                 web UI (React + TypeScript + Vite + Tailwind), served through the gateway; see docs/FRONTEND.md
 k8s/                      Kubernetes manifests (namespace resqnet), applied in file-name order
 db/init-databases.sh      creates the 4 databases and 4 users (also embedded in k8s/02-config.yaml)
 docker-compose.yml        local Postgres (host port 5433) + RabbitMQ
@@ -214,6 +215,12 @@ Full details, payloads and error codes: [`docs/API_CONTRACT.md`](docs/API_CONTRA
 
 ---
 
+## 7b. Web UI
+
+Open the gateway address in a browser (`kubectl -n resqnet port-forward svc/api-gateway 8080:8080`, then `http://localhost:8080`, or the public tunnel address). The React app in `frontend/` is served by the gateway itself (a lowest-priority route to an nginx pod) and calls the API on the same address under `/api`, so it never talks to a single microservice. Sign in as the seeded dispatcher `admin` / `Admin@123` (demo value) or register a reporter. Details, role matrix, honest gap list and tests: [`docs/FRONTEND.md`](docs/FRONTEND.md).
+
+---
+
 ## 8. Security model
 
 - Passwords are stored as **BCrypt** hashes; public registration always creates role `USER`.
@@ -257,6 +264,7 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | endpoints, payloads, status codes, events (highest authority) |
 | [`docs/schema.md`](docs/schema.md) | tables, enums, state machines |
 | [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | JWT, gateway filter, role matrix, security checklist |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | web UI: pages and roles, how it is served by the gateway, API usage, gaps, local run, Docker/Kubernetes, tests |
 | [`docs/rules.md`](docs/rules.md) | coding / Kubernetes / git rules |
 | [`docs/tracker.md`](docs/tracker.md) | live task list, decisions log, work log |
 | [`docs/viva/VIVA_SCRIPT.md`](docs/viva/VIVA_SCRIPT.md) | viva script: introductions, demo narration, file walkthrough, flows, Docker/Kubernetes explained, 36 likely questions with answers |
@@ -285,7 +293,7 @@ Load test: `scripts/load-test.ps1` (see section 7). **Result (two runs, each on 
 | `scripts/load-test.ps1` | 20 parallel users; shows which pod answered |
 | `scripts/verify-references.ps1` | checks every `file:line` reference in `docs/viva/` against the source |
 | `scripts/start-public-url.ps1` | temporary public HTTPS link (Cloudflare quick tunnel) to the gateway on the laptop; `-Check` runs the smoke test through it |
-| `scripts/run-unit-tests.ps1` | all 51 JUnit tests with a summary table |
+| `scripts/run-unit-tests.ps1` | all 58 JUnit tests with a summary table |
 | `scripts/verify-docs.ps1` | checks that every file, link, script option, class.method and Kubernetes name mentioned in the documents exists |
 | `scripts/rehearsal.ps1` | everything above from a clean cluster, with a summary table |
 

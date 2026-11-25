@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* ResQNet design tokens: a dark navy command-center palette. Red is reserved for critical emergencies, amber for
+   pending work, green for available responders, blue for primary actions. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-night: #0a1020;   /* page background */
+  --color-panel: #101a30;   /* cards */
+  --color-panel-2: #15223d; /* raised surfaces, hover */
+  --color-line: #22314f;    /* borders */
+  --color-ink: #e6ebf5;     /* primary text */
+  --color-mute: #8fa0bf;    /* secondary text */
+  --color-faint: #5d6e8e;   /* tertiary text */
+
+  --color-brand: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-critical: #ef4444;
+  --color-amber: #f59e0b;
+  --color-ok: #22c55e;
+  --color-sky: #38bdf8;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  /* thin dark scrollbars for the tables and the sidebar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+  }
+}
+
+/* Small, calm motion only: a short fade for toasts and dialogs. */
+@keyframes rq-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rq-fade-in {
+  animation: rq-fade-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rq-fade-in { animation: none; }
+}

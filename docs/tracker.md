@@ -12,6 +12,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | Phase | ALL PHASES (0-7) DONE; only owner-side checks remain (docs/FINAL_CHECKLIST.md section C) |
 | Next action | Owner checks the items under "NOT independently verified" in docs/TEST_REPORT.md, incl. the public link from a phone |
 | Blockers | None. Owner to try the public link from a phone on mobile data |
+| Web UI | built and deployed (frontend/, k8s/40-frontend.yaml, docs/FRONTEND.md); 41 unit tests + 7 gateway tests pass |
 | Last updated | 25 Nov 2026 |
 
 ## Rubric tracker (8 criteria on the lab slide, photo in Documents/)
@@ -25,7 +26,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | Resilience | One service down while others still answer | [x] `scripts/demo-resilience.ps1` (16/16) |
 | Service discovery and gateway | Eureka and one gateway entry point | [x] discovery-service (Eureka) + api-gateway with `lb://` routes |
 | Security | Authentication checked at the gateway | [x] 401 / 403 / forged and expired token checks in the smoke test |
-| Testing | JUnit tests per service, documented | [x] 51 tests; `docs/TEST_REPORT.md` |
+| Testing | JUnit tests per service, documented | [x] 58 tests; `docs/TEST_REPORT.md` |
 
 ## Phase 0 - Environment (do before Hour 0)
 
@@ -172,6 +173,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 | 25 Nov 2026 | Claude | Public URL: owner chose a Cloudflare quick tunnel. Downloaded cloudflared-windows-amd64.exe 2026.11.2 (52.9 MB) from the official cloudflare/cloudflared GitHub release into tools/cloudflared/ (git-ignored); SHA-256 equals the release digest, signature Valid (Cloudflare, Inc.). scripts/start-public-url.ps1: first run failed on a locked log file, fixed; `-Check` run: public address https://ready-fifth-mileage-processing.trycloudflare.com answered, smoke test 37/37 through it, tunnel closed, no process left. README/DEMO_SCRIPT/VIVA/TEST_REPORT updated | Done |
 | 25 Nov 2026 | Claude | Phase 7 final QA: `rehearsal.ps1 -Rebuild` from a deleted namespace PASSED (6 jars + 6 images rebuilt, deploy 258 s, smoke 37/37, resilience 16/16, failover 7/7, newman 43/43, load 1500 x 200 at 151 req/s p95 208 ms, 251/249 split, refs 43/43, 9 pods 0 restarts) | Done |
 | 25 Nov 2026 | Claude | Phase 6: wrote docs/viva/VIVA_SCRIPT.md, QUICK_REVISION.md, docs/demo/DEMO_SCRIPT.md, docs/TEST_REPORT.md; 6 Mermaid diagrams rendered to PNG with mermaid-cli (Edge as browser) and each PNG viewed (2 simplified after first render, 1 syntax error fixed); scripts/run-unit-tests.ps1 (51 tests PASS: auth 5, gateway 14, responder 4, incident 19, notification 9); scripts/verify-docs.ps1 (first run found 9 wrong references in my docs, fixed; final 236 correct / 0 wrong; negative test catches missing file, bad option, missing method, unknown k8s name); forged/expired/wrong-issuer token checks added to smoke-test.ps1 (now 37/37); DEMO_SCRIPT followed from the first line on the live cluster: all steps as documented | Done |
+| 25 Nov 2026 | Claude | Web UI (owner asked for a real interface): frontend/ React 19 + TypeScript + Vite + Tailwind + Router + Axios + Recharts; 11 pages incl. role-aware admin dispatch, notifications polling, client-side analytics. Backend untouched except api-gateway: lowest-priority `frontend` route (GET/HEAD, not /api /internal /actuator) and the JWT filter lets only that route through without a token; GatewayFrontendRouteTest 7/7. Dockerfile (node build -> nginx), k8s/40-frontend.yaml, deploy-minikube.ps1 and CI job extended. Deployed WITHOUT deleting the namespace (image load, apply, gateway restart); smoke test 37/37 afterwards; browser run: admin and reporter flows, responder outage, tampered token -> logout notice, USER blocked from /app/admin, mobile layout | Done |
 
 ## Command cheat sheet (demo day)
 
