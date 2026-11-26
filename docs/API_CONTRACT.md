@@ -1,4 +1,4 @@
-# API Contract - ResQNet Lite
+# API Contract - AegisFlow
 
 Single source of truth for endpoints, payloads, status codes and events.
 If code and this document disagree, fix one of them in the same commit.

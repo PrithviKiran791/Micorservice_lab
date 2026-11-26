@@ -1,4 +1,4 @@
-# UI - ResQNet Lite
+# UI - AegisFlow
 
 ## 1. Decision
 
@@ -103,7 +103,7 @@ Token stored in `sessionStorage`. Poll every 3 seconds while a view is visible.
 **S1 - Login / Register**
 ```text
 +------------------------------------------+
-|  ResQNet Lite                            |
+|  AegisFlow                               |
 |  Username  [______________]              |
 |  Password  [______________]              |
 |  [ Login ]   [ Register ]                |
@@ -115,7 +115,7 @@ Calls: `POST /api/auth/login`, `POST /api/auth/register`. On success go to S2 (U
 **S2 - Reporter view**
 ```text
 +-----------------------------------------------------------+
-| ResQNet Lite            asha (USER)              [Logout] |
+| AegisFlow               asha (USER)              [Logout] |
 |-----------------------------------------------------------|
 | Report emergency                                          |
 | Type [MEDICAL v]  Severity [CRITICAL v]                   |
@@ -136,7 +136,7 @@ Calls: `POST /api/incidents`, `GET /api/incidents`, `GET /api/notifications`.
 **S3 - Dispatcher view (ADMIN)**
 ```text
 +-----------------------------------------------------------+
-| ResQNet Lite            admin (ADMIN)            [Logout] |
+| AegisFlow               admin (ADMIN)            [Logout] |
 |  [!] Responder service unavailable   <- banner on 503     |
 |-----------------------------------------------------------|
 | Incidents (all)           Filter [ALL v]                  |

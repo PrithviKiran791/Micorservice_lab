@@ -52,7 +52,7 @@ export default function Landing() {
               Coordinate emergency response, even when parts of the system fail.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-200/90 sm:text-lg">
-              ResQNet Lite connects people who report emergencies with the dispatchers and responders who handle them. Incidents are never lost: if no
+              AegisFlow connects people who report emergencies with the dispatchers and responders who handle them. Incidents are never lost: if no
               responder is reachable, they wait in the queue and are dispatched as soon as one is.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -194,7 +194,7 @@ export default function Landing() {
       <footer className="mx-auto max-w-6xl px-4 pt-4 pb-8 sm:px-6">
         <div className="glass-nav flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 text-sm text-slate-300/80">
           <Logo compact />
-          <p>ResQNet Lite - Microservices Lab project. A simulation for learning.</p>
+          <p>AegisFlow - Coordinating Response. Protecting Lives. A Microservices Lab project and learning simulation.</p>
         </div>
       </footer>
     </div>

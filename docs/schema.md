@@ -1,4 +1,4 @@
-# Schema - ResQNet Lite
+# Schema - AegisFlow
 
 Four PostgreSQL databases on one server, one DB user per service. No foreign keys across databases;
 cross-service references are plain ids validated through APIs/events.

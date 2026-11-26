@@ -42,7 +42,7 @@ export default function Login() {
   }
 
   return (
-    <AuthShell title="Sign in" subtitle="Use your ResQNet account to report incidents or manage dispatch.">
+    <AuthShell title="Sign in" subtitle="Use your AegisFlow account to report incidents or manage dispatch.">
       {sessionExpired && (
         <div className="mb-5" onClick={dismissExpiredNotice}>
           <InlineNotice title="Your session ended">For your security you were signed out. Please sign in again.</InlineNotice>

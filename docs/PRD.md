@@ -1,8 +1,8 @@
-# PRD - ResQNet Lite
+# PRD - AegisFlow
 
 | | |
 |---|---|
-| Product | ResQNet Lite - Distributed Emergency Response Coordination (simulation) |
+| Product | AegisFlow – A Scalable Microservices-Based Emergency Response and Incident Coordination Platform (simulation; formerly ResQNet Lite) |
 | Context | Microservices Lab project (20 marks), Spring Boot + Kubernetes (Minikube) |
 | Status | v1.1 - updated on 25 Nov 2026 to match what was built and the 8-criteria lab rubric |
 | Date | 25 Nov 2026 |
@@ -10,7 +10,7 @@
 
 ## 1. Summary
 
-ResQNet Lite lets a user report an emergency (medical, fire, police). The system saves the
+AegisFlow lets a user report an emergency (medical, fire, police). The system saves the
 incident, asks a separate responder service for an available responder of the right type,
 assigns it, and publishes an event so a notification service can record a notification.
 If the responder service is unavailable, the incident is **still accepted** and marked

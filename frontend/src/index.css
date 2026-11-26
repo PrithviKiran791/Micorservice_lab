@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ResQNet design tokens: a dark navy command-center palette. Red is reserved for critical emergencies, amber for
+/* AegisFlow design tokens: a dark navy command-center palette. Red is reserved for critical emergencies, amber for
    pending work, green for available responders, blue for primary actions. */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

@@ -1,4 +1,4 @@
-// The real architecture of ResQNet Lite, as read from the code and manifests (docs/INTEGRATION_AUDIT.md section 1).
+// The real architecture of AegisFlow, as read from the code and manifests (docs/INTEGRATION_AUDIT.md section 1).
 // This is design information, not live data: the Architecture page labels it so and adds live health where the
 // operations API provides it.
 

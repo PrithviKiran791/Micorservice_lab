@@ -1,4 +1,4 @@
-# ResQNet Lite - Demo Script (about 5 minutes + 2 optional)
+# AegisFlow - Demo Script (about 5 minutes + 2 optional)
 
 ## Before you start (do this 10 minutes earlier)
 

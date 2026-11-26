@@ -1,6 +1,12 @@
-# ResQNet Lite
+# AegisFlow
 
-**A microservices-based emergency dispatch platform** built for a college Microservices Lab.
+**AegisFlow – A Scalable Microservices-Based Emergency Response and Incident Coordination Platform.**
+
+*Coordinating Response. Protecting Lives.*
+
+> Branding note: the project was previously called "ResQNet Lite". Internal identifiers (the `resqnet` Kubernetes namespace, `resqnet/<service>` image names, `com.resqnet.*` packages, the `resqnet.events` exchange and similar) are intentionally unchanged.
+
+AegisFlow is a microservices-based emergency dispatch platform built for a college Microservices Lab.
 A user reports an emergency (medical, fire, police). The system saves it, asks a separate service for a free
 responder of the right type, assigns one, and records a notification. If the responder service is down, the
 incident is **still accepted** as `PENDING` and can be dispatched later.

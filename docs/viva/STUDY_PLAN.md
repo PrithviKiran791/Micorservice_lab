@@ -1,4 +1,4 @@
-# ResQNet Lite - 3-Hour Study Plan (for the viva)
+# AegisFlow - 3-Hour Study Plan (for the viva)
 
 Goal: after these three hours you can explain the project from the request on the screen down to the database, Docker and Kubernetes.
 Do the blocks in order. Say the explanations **out loud**; reading silently is not enough for a viva.

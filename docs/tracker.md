@@ -1,4 +1,4 @@
-# Tracker - ResQNet Lite
+# Tracker - AegisFlow
 
 Live status board. Update it after every task (tick the box, add a line to the log).
 Legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.

@@ -1,4 +1,4 @@
-# ResQNet Lite - Final Checklist (Phase 7)
+# AegisFlow - Final Checklist (Phase 7)
 
 Status on 25 Nov 2026. "Evidence" points to a file in this repository or a command you can run.
 

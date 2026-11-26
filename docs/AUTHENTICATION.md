@@ -1,4 +1,4 @@
-# Authentication and Authorization - ResQNet Lite
+# Authentication and Authorization - AegisFlow
 
 Rubric requirement: **authentication is checked at the gateway.**
 Design: auth-service issues a signed JWT; the API Gateway validates it on every non-public request

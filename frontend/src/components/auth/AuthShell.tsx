@@ -34,7 +34,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 
         <aside className="glass-panel hidden rounded-3xl p-8 lg:block">
           <span className="glass-pill inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sky">
-            ResQNet Operations
+            AegisFlow Operations
           </span>
           <h2 className="mt-3 text-xl font-semibold leading-snug text-white">
             Report, dispatch and track emergencies in one place.

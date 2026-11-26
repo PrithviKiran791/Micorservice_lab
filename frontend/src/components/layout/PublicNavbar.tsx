@@ -25,7 +25,7 @@ export function PublicNavbar({ variant = 'landing' }: PublicNavbarProps) {
   return (
     <header className="sticky top-3 z-30 mx-auto w-full max-w-6xl px-4 sm:px-6">
       <div className="glass-nav flex h-16 items-center justify-between gap-4 rounded-2xl px-4 sm:px-5">
-        <Link to="/" aria-label="ResQNet Lite home" className="shrink-0">
+        <Link to="/" aria-label="AegisFlow home" className="shrink-0">
           <Logo />
         </Link>
 

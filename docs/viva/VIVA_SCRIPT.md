@@ -1,4 +1,4 @@
-# ResQNet Lite - Viva Script
+# AegisFlow - Viva Script
 
 How to use this file: read sections A to C once, practise the demo (section B) twice with `docs/demo/DEMO_SCRIPT.md`,
 then read the questions in section G out loud. Every file, class, method, command and number below exists in the repository;
@@ -10,7 +10,7 @@ the exact line numbers are in [`CODE_REFERENCES.md`](CODE_REFERENCES.md) (genera
 
 ### A1. One-minute version
 
-"My project is **ResQNet Lite**, an emergency dispatch system built as **six Spring Boot microservices** and deployed on
+"My project is **AegisFlow**, an emergency dispatch system built as **six Spring Boot microservices** and deployed on
 **Kubernetes (Minikube)**. A user reports an emergency, for example a medical case. The system saves it, asks a separate
 **responder service** for a free ambulance, assigns it, and a **notification service** records a notification.
 The important idea: if the responder service is down, the incident is **still accepted** with status `PENDING` and can be

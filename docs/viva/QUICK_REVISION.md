@@ -1,4 +1,4 @@
-# ResQNet Lite - Quick Revision (one page)
+# AegisFlow - Quick Revision (one page)
 
 **One sentence:** a user reports an emergency; the system saves it, asks a separate service for a free responder, assigns it, and records a notification; if the responder service is down the incident is still accepted as `PENDING`.
 

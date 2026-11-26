@@ -30,7 +30,7 @@ function SidebarContent() {
         <div className="flex h-10 items-center px-1.5">
           <Link
             to={homeFor(user?.role)}
-            aria-label="ResQNet Lite home"
+            aria-label="AegisFlow home"
             onClick={() => {
               if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                 setOpen(false)

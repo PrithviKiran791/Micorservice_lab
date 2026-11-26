@@ -1,4 +1,4 @@
-/** The ResQNet mark: a red shield with a white cross, next to the wordmark. */
+/** The AegisFlow mark: a red shield with a white cross, next to the wordmark. */
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5">
@@ -9,7 +9,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
       </svg>
       {!compact && (
         <span className="leading-tight">
-          <span className="block text-base font-semibold tracking-tight text-ink">ResQNet Lite</span>
+          <span className="block text-base font-semibold tracking-tight text-ink">AegisFlow</span>
           <span className="block text-[11px] uppercase tracking-wider text-faint">Emergency operations</span>
         </span>
       )}

@@ -1,8 +1,8 @@
-# Architecture - ResQNet Lite
+# Architecture - AegisFlow
 
 ## 1. Overview
 
-ResQNet Lite is six Spring Boot applications (five services plus the Eureka registry) plus PostgreSQL and RabbitMQ, all running as
+AegisFlow (formerly ResQNet Lite) is six Spring Boot applications (five services plus the Eureka registry) plus PostgreSQL and RabbitMQ, all running as
 workloads in one Minikube namespace (`resqnet`). Clients talk only to the **API Gateway**.
 The gateway authenticates the JWT and routes requests to the owning service. Services
 communicate in two ways: a **synchronous REST call** (incident -> responder) and an

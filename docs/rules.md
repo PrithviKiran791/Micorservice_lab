@@ -1,4 +1,4 @@
-# Rules - ResQNet Lite
+# Rules - AegisFlow
 
 Normative rules for everyone (and every AI agent) working on this project.
 **MUST / MUST NOT** are mandatory. **SHOULD** is expected unless there is a stated reason.

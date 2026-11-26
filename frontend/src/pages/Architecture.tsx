@@ -83,7 +83,7 @@ export default function Architecture() {
             })}
           </div>
 
-          <svg viewBox="0 0 1000 600" className="block w-full" role="img" aria-label="Architecture diagram of ResQNet Lite">
+          <svg viewBox="0 0 1000 600" className="block w-full" role="img" aria-label="Architecture diagram of AegisFlow">
             <defs>
               {(Object.keys(EDGE_STYLE) as EdgeKind[]).map((kind) => (
                 <marker key={kind} id={`arrow-${kind}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
